@@ -1,0 +1,10 @@
+## Interface: 110100
+## Title: GPlater
+## Notes: Adjusts friendly nameplates, colors nameplates based on auras, and handles spell casts with configurable settings.
+## Author: Godfrey
+## Version: 202504211520
+## SavedVariables: GPlaterDB
+## Dependencies: Plater
+
+GPlater.lua
+Skills.lua
