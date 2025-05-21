@@ -1,2097 +1,1474 @@
--- Config.lua: Localization, settings panel, initialization, and all module logic for GPlater addon
+local _G = _G
+local _, GPlaterNS = ...
+_G.GPlaterNS = GPlaterNS
+_G.GPlaterDB = _G.GPlaterDB or {}
 
-----------------------------------------
--- Localization
-----------------------------------------
-L = {}
+function GPlaterNS.InitializeCoreModules()
+    _G.GPlaterNS = _G.GPlaterNS or {}
+    GPlaterNS = _G.GPlaterNS
+    GPlaterNS.State.debugLevel = GPlaterNS.State.debugLevel or 4
+    
+    if GPlaterNS.Utils.LoadLogSettingsFromConfig then
+        GPlaterNS.Utils:LoadLogSettingsFromConfig()
+    end
+end
 
-local locale = GetLocale()
-
--- English (enUS) - default
-L["enUS"] = {
-    ["SETTINGS_PANEL_TITLE"] = "GPlater %s",
-    ["ADDON_VERSION"] = "2.0.4",
-    ["GENERAL_TAB"] = "General",
-    ["FRIENDLY_NAMEPLATES_TAB"] = "Friendly Nameplates",
-    ["AURA_COLORING_TAB"] = "Aura Coloring",
-    ["CAST_HANDLING_TAB"] = "Cast Handling",
-    ["PLATER_NOT_LOADED"] = "Plater is not loaded. GPlater requires Plater to function.",
-    ["WELCOME_MESSAGE"] = "Welcome to GPlater settings. Select a tab to configure specific modules.",
-    ["MODULE_LOAD_ERROR"] = "Module %s failed to load: %s",
-    ["FONT_SIZE"] = "Font Size",
-    ["FRIENDLY_NAMEPLATE_WIDTH"] = "Nameplate Width",
-    ["NAMEPLATE_VERTICAL_SCALE"] = "Vertical Scale",
-    ["ENABLE_FRIENDLY_CLICK_THROUGH"] = "Enable Click-Through",
-    ["HIDE_FRIENDLY_BUFFS"] = "Hide Friendly Buffs",
-    ["SHOW_FRIENDLY_NPCS"] = "Show Friendly NPCs",
-    ["SHOW_ONLY_FRIENDLY_NAMES"] = "Show Only Names",
-    ["ENABLE_AURA_COLORING"] = "Enable Aura Coloring",
-    ["USE_IN_PVP"] = "Use in PvP",
-    ["USE_RAID_MARKS"] = "Use Raid Marks",
-    ["RESET_AT_30_PERCENT"] = "Reset at 30% Duration",
-    ["AURA_ID"] = "Aura ID",
-    ["SPELL_NAME"] = "Spell Name",
-    ["AURA_NAME"] = "Aura Name",
-    ["STACKS"] = "Stacks",
-    ["NAME_TEXT"] = "Name Text",
-    ["NAMEPLATE"] = "Nameplate",
-    ["BORDER"] = "Border",
-    ["FLASH"] = "Flash",
-    ["DELETE"] = "Delete",
-    ["ADD_AURA"] = "Add Aura",
-    ["STACKS_NOT_CHECKED"] = "Not Checked",
-    ["ENABLE_CAST_HANDLING"] = "Enable Cast Handling",
-    ["SPELL_ID"] = "Spell ID",
-    ["SPECIAL_ATTENTION"] = "Special Attention",
-    ["TOP_PRIORITY"] = "Top Priority",
-    ["ADD_SPELL"] = "Add Spell",
-    ["ALWAYS_SHOW_TARGET_UNIT"] = "Always Show Target Unit",
-    ["ALWAYS_SHOW_MARKED_UNITS"] = "Always Show Marked Units",
-    ["RESET_TO_DEFAULTS"] = "Reset to Defaults",
-    ["INVALID_SPELL_ID"] = "Invalid spell ID(s) entered: %s. Please check the ID(s)."
+GPlaterNS.State = {
+    Nameplates = setmetatable({}, {__mode = "v"}),
+    ActiveAuras = setmetatable({}, {__mode = "v"}),
+    PlaterSettings = setmetatable({}, {__mode = "v"}),
+    HiddenNameplates = setmetatable({}, {__mode = "v"}),
+    auraConfig = {},
+    UnitsMarkedAsUniqueByGPlater = setmetatable({}, {__mode = "v"}),
+    playerGUID = UnitGUID("player"),
+    petGUID = UnitGUID("pet") or "",
+    debugLevel = 4
 }
 
--- Chinese (zhCN)
-L["zhCN"] = {
-    ["SETTINGS_PANEL_TITLE"] = "GPlater %s",
-    ["ADDON_VERSION"] = "2.0.4",
-    ["GENERAL_TAB"] = "通用设置",
-    ["FRIENDLY_NAMEPLATES_TAB"] = "友好姓名板",
-    ["AURA_COLORING_TAB"] = "光环着色",
-    ["CAST_HANDLING_TAB"] = "施法处理",
-    ["PLATER_NOT_LOADED"] = "未加载 Plater。GPlater 需要 Plater 才能运行。",
-    ["WELCOME_MESSAGE"] = "欢迎使用 GPlater 设置。选择一个选项卡以配置特定模块。",
-    ["MODULE_LOAD_ERROR"] = "模块 %s 加载失败：%s",
-    ["FONT_SIZE"] = "字体大小",
-    ["FRIENDLY_NAMEPLATE_WIDTH"] = "姓名板宽度",
-    ["NAMEPLATE_VERTICAL_SCALE"] = "垂直缩放",
-    ["ENABLE_FRIENDLY_CLICK_THROUGH"] = "启用点击穿透",
-    ["HIDE_FRIENDLY_BUFFS"] = "隐藏友好增益",
-    ["SHOW_FRIENDLY_NPCS"] = "显示友好 NPC",
-    ["SHOW_ONLY_FRIENDLY_NAMES"] = "仅显示名称",
-    ["ENABLE_AURA_COLORING"] = "启用光环着色",
-    ["USE_IN_PVP"] = "在 PvP 中使用",
-    ["USE_RAID_MARKS"] = "使用团队标记",
-    ["RESET_AT_30_PERCENT"] = "在 30% 持续时间重置",
-    ["AURA_ID"] = "光环 ID",
-    ["SPELL_NAME"] = "法术名称",
-    ["AURA_NAME"] = "光环名称",
-    ["STACKS"] = "层数",
-    ["NAME_TEXT"] = "名称文本",
-    ["NAMEPLATE"] = "姓名板",
-    ["BORDER"] = "边框",
-    ["FLASH"] = "闪光",
-    ["DELETE"] = "删除",
-    ["ADD_AURA"] = "添加光环",
-    ["STACKS_NOT_CHECKED"] = "未检查",
-    ["ENABLE_CAST_HANDLING"] = "启用施法处理",
-    ["SPELL_ID"] = "技能 ID",
-    ["SPECIAL_ATTENTION"] = "特别关注",
-    ["TOP_PRIORITY"] = "最高优先级",
-    ["ADD_SPELL"] = "添加技能",
-    ["ALWAYS_SHOW_TARGET_UNIT"] = "始终显示目标单位",
-    ["ALWAYS_SHOW_MARKED_UNITS"] = "始终显示标记单位",
-    ["RESET_TO_DEFAULTS"] = "重置为默认值",
-    ["INVALID_SPELL_ID"] = "无效的技能ID：%s，请检查ID。"
-}
+local EffectUtils = {}
+local NameplateManager = {}
+local AuraManager = {}
+local EventFrame = CreateFrame("Frame", "GPlaterEventFrame")
+local EventManager = { eventFrame = EventFrame }
 
--- If language is not defined, use English
-if not L[locale] then
-    L[locale] = L["enUS"]
-end
+GPlaterNS.EffectUtils = EffectUtils
+GPlaterNS.NameplateManager = NameplateManager
+GPlaterNS.AuraManager = AuraManager
+GPlaterNS.EventManager = EventManager
 
--- Validate localization keys
-for key, value in pairs(L["enUS"]) do
-    if L[locale][key] == nil then
-        L[locale][key] = value
-    end
-end
-
-local GPlaterL = L[locale]
-
-----------------------------------------
--- Initialization and Database Setup
-----------------------------------------
-GPlaterDB = GPlaterDB or {}
-local PLAYER_CLASS = select(2, UnitClass("player")) or "UNKNOWN"
-
--- Consolidated initialization for all modules
-local function InitializeDatabase()
-    -- Friendly Nameplates defaults
-    local friendlyDefaults = {
-        H = 1.0, -- NamePlateVerticalScale
-        Hbase = 0, -- Base height offset
-        OverlapV = 0.8, -- Vertical overlap
-        Size = 10, -- Font size
-        Friendly = {
-            Width = 100, -- Unified friendly nameplate width
-            distance = 20, -- Distance/height
-            FriendlyClickThrough = 0, -- 0 = disabled, 1 = enabled
-            HFB = false, -- Hide friendly buffs
-            ShowFriendlyNPCs = 1, -- Show friendly NPCs (1 = show, 0 = hide)
-            ShowOnlyFriendNames = 0, -- Show only friendly names (1 = enabled, 0 = disabled)
-        }
-    }
-
-    -- Aura Coloring defaults
-    local auraDefaults = {
-        UseInPvP = true,
-        EnableAuraColoring = true,
-        UseRaidMarks = false,
-        ResetAt30Percent = false,
-        ColorByMark = {
-            [1] = "#ffd700", -- Star (gold)
-            [2] = "#ff8c00", -- Circle (darkorange)
-            [3] = "#9932cc", -- Diamond (darkorchid)
-            [4] = "#228b22", -- Triangle (forestgreen)
-            [5] = "#add8e6", -- Moon (lightblue)
-            [6] = "#191970", -- Square (midnightblue)
-            [7] = "#800000", -- Cross (maroon)
-            [8] = "#f8f8ff"  -- Skull (ghostwhite)
-        },
-        BuffsToMatch = {
-            { auras = {980, 146739, 316099}, nameTextColor = "#780095", nameplateColor = "#780095", borderColor = "#780095", flash = false, hideNameplate = false },
-            { auras = {445474}, nameTextColor = "#ff2217", nameplateColor = "#ff144c", borderColor = "#44ff7c", flash = false, hideNameplate = false }
-        },
-        FilteredBuffsToMatch = {},
-        DefaultTextColors = {}
-    }
-
-    -- Cast Handling defaults
-    local castDefaults = {
-        EnableCastHandling = true,
-        SpellsToMonitor = {
-            { spellID = 2060, specialAttention = true, topPriority = false }, -- Heal (Priest)
-            { spellID = 116, specialAttention = false, topPriority = true }   -- Frostbolt (Mage)
-        },
-        _ConcernedNum = 0,
-        topPriorityUnits = {},
-        castCounter = 0,
-        unitKeys = {},
-        pendingFrameLevels = {},
-        config = {
-            showOnTargeting = true,
-            showOnMark = true
-        }
-    }
-
-    -- Initialize database with defaults if not set
-    GPlaterDB.Friendly = GPlaterDB.Friendly or {}
-    for k, v in pairs(friendlyDefaults) do
-        GPlaterDB.Friendly[k] = GPlaterDB.Friendly[k] or v
-    end
-
-    GPlaterDB.AuraColoring = GPlaterDB.AuraColoring or {}
-    for k, v in pairs(auraDefaults) do
-        GPlaterDB.AuraColoring[k] = GPlaterDB.AuraColoring[k] or v
-    end
-
-    GPlaterDB.CastHandling = GPlaterDB.CastHandling or {}
-    for k, v in pairs(castDefaults) do
-        GPlaterDB.CastHandling[k] = GPlaterDB.CastHandling[k] or v
-    end
-
-    -- Initialize last selected tab
-    GPlaterDB.lastSelectedTab = GPlaterDB.lastSelectedTab or "Aura Coloring"
-end
-
-----------------------------------------
--- Friendly Nameplates Module
-----------------------------------------
-
--- Utility function to set font
-local function SetFont(obj, optSize)
-    if not obj or not obj:IsObjectType("FontString") then return end
-    local fontName, _, fontFlags = obj:GetFont()
-    obj:SetFont(fontName or "Fonts\\FRIZQT__.TTF", optSize, "OUTLINE")
-    obj:SetShadowOffset(0, 0)
-end
-
--- Function to update nameplate fonts
-local function UpdateFont(s)
-    local size = s or GPlaterDB.Friendly.Size or 10
-    SetFont(SystemFont_LargeNamePlate, size)
-    SetFont(SystemFont_LargeNamePlateFixed, size)
-    SetFont(SystemFont_NamePlate, size)
-    SetFont(SystemFont_NamePlateFixed, size)
-    SetFont(SystemFont_NamePlateCastBar, math.max(size - 2, 1))
-end
-
--- Function to update nameplate sizes
-local function UpdateFriendlyNameplatesSize()
-    local inInstance, instanceType = IsInInstance()
-    if inInstance and (instanceType == "party" or instanceType == "raid") and not InCombatLockdown() then
-        local width = GPlaterDB.Friendly.Friendly.Width or 100
-        local clickThrough = GPlaterDB.Friendly.Friendly.FriendlyClickThrough == 1
-        C_NamePlate.SetNamePlateFriendlyClickThrough(clickThrough)
-        C_NamePlate.SetNamePlateFriendlySize(width, clickThrough and GPlaterDB.Friendly.Friendly.distance or (GPlaterDB.Friendly.H * 12 + GPlaterDB.Friendly.Hbase))
-    end
-end
-
--- Function to apply settings
-local function UpdateFriendlyNameplates()
-    local inInstance, instanceType = IsInInstance()
-    if not (inInstance and (instanceType == "party" or instanceType == "raid")) then return end
-
-    if InCombatLockdown() then
-        GPlaterDB.Friendly.updateCV = true
-        return
-    end
-
-    SetCVar("NamePlateVerticalScale", GPlaterDB.Friendly.H or 1.0)
-    SetCVar("nameplateOverlapV", GPlaterDB.Friendly.OverlapV or 0.8)
-    SetCVar("nameplateShowFriendlyNPCs", GPlaterDB.Friendly.Friendly.ShowFriendlyNPCs or 1)
-    SetCVar("nameplateShowOnlyNames", GPlaterDB.Friendly.Friendly.ShowOnlyFriendNames or 0)
-    SetCVar("nameplateShowFriendlyBuffs", GPlaterDB.Friendly.Friendly.HFB and 0 or 1)
-    SetCVar("nameplateShowDebuffsOnFriendly", GPlaterDB.Friendly.Friendly.HFB and 0 or 1)
-    UpdateFont()
-    UpdateFriendlyNameplatesSize()
-end
-
--- Create Friendly Nameplates content
-local function CreateFriendlyNameplatesContent(parent)
-    if not parent then return CreateFrame("Frame", nil, UIParent) end
-
-    local contentFrame = CreateFrame("Frame", nil, parent)
-    contentFrame:SetSize(740, 350)
-
-    -- Font Size Slider
-    local fontSlider = CreateFrame("Slider", nil, contentFrame, "OptionsSliderTemplate")
-    fontSlider:SetPoint("TOPLEFT", 10, -20)
-    fontSlider:SetWidth(360)
-    fontSlider:SetMinMaxValues(6, 20)
-    fontSlider:SetValueStep(1)
-    fontSlider:SetObeyStepOnDrag(true)
-    fontSlider.Text:SetText(GPlaterL["FONT_SIZE"])
-    fontSlider.Low:SetText("6")
-    fontSlider.High:SetText("20")
-    fontSlider:SetValue(GPlaterDB.Friendly.Size or 10)
-    fontSlider:SetScript("OnValueChanged", function(self, value)
-        GPlaterDB.Friendly.Size = value
-        UpdateFont(value)
-    end)
-
-    -- Width Slider
-    local widthSlider = CreateFrame("Slider", nil, contentFrame, "OptionsSliderTemplate")
-    widthSlider:SetPoint("TOPLEFT", 10, -80)
-    widthSlider:SetWidth(360)
-    widthSlider:SetMinMaxValues(50, 200)
-    widthSlider:SetValueStep(1)
-    widthSlider:SetObeyStepOnDrag(true)
-    widthSlider.Text:SetText(GPlaterL["FRIENDLY_NAMEPLATE_WIDTH"])
-    widthSlider.Low:SetText("50")
-    widthSlider.High:SetText("200")
-    widthSlider:SetValue(GPlaterDB.Friendly.Friendly.Width or 100)
-    widthSlider:SetScript("OnValueChanged", function(self, value)
-        GPlaterDB.Friendly.Friendly.Width = value
-        UpdateFriendlyNameplatesSize()
-    end)
-
-    -- Vertical Scale Slider
-    local verticalScaleSlider = CreateFrame("Slider", nil, contentFrame, "OptionsSliderTemplate")
-    verticalScaleSlider:SetPoint("TOPLEFT", 10, -140)
-    verticalScaleSlider:SetWidth(360)
-    verticalScaleSlider:SetMinMaxValues(0.5, 2.0)
-    verticalScaleSlider:SetValueStep(0.1)
-    verticalScaleSlider:SetObeyStepOnDrag(true)
-    verticalScaleSlider.Text:SetText(GPlaterL["NAMEPLATE_VERTICAL_SCALE"])
-    verticalScaleSlider.Low:SetText("0.5")
-    verticalScaleSlider.High:SetText("2.0")
-    verticalScaleSlider:SetValue(GPlaterDB.Friendly.H or 1.0)
-    verticalScaleSlider:SetScript("OnValueChanged", function(self, value)
-        GPlaterDB.Friendly.H = value
-        UpdateFriendlyNameplates()
-    end)
-
-    -- Click-Through Checkbox
-    local clickThroughCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-    clickThroughCheck:SetPoint("TOPLEFT", 10, -200)
-    clickThroughCheck:SetSize(26, 26)
-    clickThroughCheck.Text:SetText(GPlaterL["ENABLE_FRIENDLY_CLICK_THROUGH"])
-    clickThroughCheck:SetChecked(GPlaterDB.Friendly.Friendly.FriendlyClickThrough == 1)
-    clickThroughCheck:SetScript("OnClick", function(self)
-        GPlaterDB.Friendly.Friendly.FriendlyClickThrough = self:GetChecked() and 1 or 0
-        if not InCombatLockdown() then
-            UpdateFriendlyNameplates()
-        else
-            GPlaterDB.Friendly.updateCV = true
-        end
-    end)
-
-    -- Hide Buffs Checkbox
-    local hideBuffsCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-    hideBuffsCheck:SetPoint("TOPLEFT", 10, -230)
-    hideBuffsCheck:SetSize(26, 26)
-    hideBuffsCheck.Text:SetText(GPlaterL["HIDE_FRIENDLY_BUFFS"])
-    hideBuffsCheck:SetChecked(GPlaterDB.Friendly.Friendly.HFB)
-    hideBuffsCheck:SetScript("OnClick", function(self)
-        GPlaterDB.Friendly.Friendly.HFB = self:GetChecked()
-        UpdateFriendlyNameplates()
-    end)
-
-    -- Show Friendly NPCs Checkbox
-    local showFriendlyNPsCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-    showFriendlyNPsCheck:SetPoint("TOPLEFT", 10, -260)
-    showFriendlyNPsCheck:SetSize(26, 26)
-    showFriendlyNPsCheck.Text:SetText(GPlaterL["SHOW_FRIENDLY_NPCS"])
-    showFriendlyNPsCheck:SetChecked(GPlaterDB.Friendly.Friendly.ShowFriendlyNPCs == 1)
-    showFriendlyNPsCheck:SetScript("OnClick", function(self)
-        GPlaterDB.Friendly.Friendly.ShowFriendlyNPCs = self:GetChecked() and 1 or 0
-        UpdateFriendlyNameplates()
-    end)
-
-    -- Show Only Names Checkbox
-    local showOnlyFriendNamesCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-    showOnlyFriendNamesCheck:SetPoint("TOPLEFT", 10, -290)
-    showOnlyFriendNamesCheck:SetSize(26, 26)
-    showOnlyFriendNamesCheck.Text:SetText(GPlaterL["SHOW_ONLY_FRIENDLY_NAMES"])
-    showOnlyFriendNamesCheck:SetChecked(GPlaterDB.Friendly.Friendly.ShowOnlyFriendNames == 1)
-    showOnlyFriendNamesCheck:SetScript("OnClick", function(self)
-        GPlaterDB.Friendly.Friendly.ShowOnlyFriendNames = self:GetChecked() and 1 or 0
-        UpdateFriendlyNameplates()
-    end)
-
-    -- Reset to Defaults Button
-    local resetButton = CreateFrame("Button", nil, contentFrame, "UIPanelButtonTemplate")
-    resetButton:SetPoint("TOPLEFT", 10, -320)
-    resetButton:SetSize(120, 22)
-    resetButton:SetText(GPlaterL["RESET_TO_DEFAULTS"])
-    resetButton:SetScript("OnClick", function()
-        GPlaterDB.Friendly = {
-            H = 1.0,
-            Hbase = 0,
-            OverlapV = 0.8,
-            Size = 10,
-            Friendly = {
-                Width = 100,
-                distance = 20,
-                FriendlyClickThrough = 0,
-                HFB = false,
-                ShowFriendlyNPCs = 1,
-                ShowOnlyFriendNames = 0
-            }
-        }
-        fontSlider:SetValue(GPlaterDB.Friendly.Size)
-        widthSlider:SetValue(GPlaterDB.Friendly.Friendly.Width)
-        verticalScaleSlider:SetValue(GPlaterDB.Friendly.H)
-        clickThroughCheck:SetChecked(GPlaterDB.Friendly.Friendly.FriendlyClickThrough == 1)
-        hideBuffsCheck:SetChecked(GPlaterDB.Friendly.Friendly.HFB)
-        showFriendlyNPsCheck:SetChecked(GPlaterDB.Friendly.Friendly.ShowFriendlyNPCs == 1)
-        showOnlyFriendNamesCheck:SetChecked(GPlaterDB.Friendly.Friendly.ShowOnlyFriendNames == 1)
-        UpdateFriendlyNameplates()
-    end)
-
-    return contentFrame
-end
-
-----------------------------------------
--- Aura Coloring Module
-----------------------------------------
-
--- Utility: Check if unit is attackable
-local function IsUnitAttackable(unit)
-    if not unit then return false end
-    local reaction = UnitReaction("player", unit)
-    return reaction and reaction <= 4
-end
-
--- Check if in PvP environment
-local function InPvP(unitId)
-    return C_PvP.IsBattleground() or C_PvP.IsArena() or (unitId and UnitIsPlayer(unitId) and UnitIsPVP(unitId))
-end
-
--- Utility: Check auras, their stacks, and duration
-local function CheckAurasAndStacks(unit, auraIDs, requiredStacks)
-    local auraMatches = {}
-    local allAurasFound = true
-    local below30Percent = false
-
-    for _, auraID in ipairs(auraIDs) do
-        auraMatches[auraID] = { found = false, stacks = 0 }
-    end
-
-    AuraUtil.ForEachAura(unit, "HARMFUL|PLAYER", nil, function(name, _, count, _, duration, expirationTime, _, _, _, spellID)
-        for _, auraID in ipairs(auraIDs) do
-            local auraInfo = AuraClassMap and AuraClassMap[auraID]
-            if auraInfo and auraInfo.class == PLAYER_CLASS and (auraInfo.spec == nil or auraInfo.spec == GetPlayerSpec()) and not IsSkillLearned(auraID) then
-                allAurasFound = false
-                return
+EffectUtils.effectHandlers = {
+    COLOR = {
+        apply = function(frame, cfg, guid)
+            if cfg.applyHealthBar then 
+                EffectUtils.ColorEffect:Apply(frame, cfg.healthBarColor, "healthBar")
             end
-            if spellID == auraID then
-                auraMatches[auraID].found = true
-                auraMatches[auraID].stacks = count or 1
-                if GPlaterDB.AuraColoring.ResetAt30Percent and duration and duration > 0 and expirationTime and expirationTime > 0 then
-                    local remaining = expirationTime - GetTime()
-                    if remaining <= duration * 0.3 then
-                        below30Percent = true
+            if cfg.applyNameText then 
+                EffectUtils.ColorEffect:Apply(frame, cfg.nameTextColor, "nameText")
+            end
+            if cfg.applyBorder then 
+                EffectUtils.ColorEffect:Apply(frame, cfg.borderColor, "border")
+            end
+        end,
+        reset = function(frame, unitType, guid, auraID)
+            GPlaterNS.Utils:Log("effectHandlers.COLOR.reset: auraID=%d for guid=%s", 3, "auras", auraID, tostring(guid))
+        end
+    },
+    SCALE = {
+        apply = function(frame, cfg, guid)
+            if cfg.applyScale then 
+                EffectUtils.ScaleEffect:Apply(frame, guid, cfg.scale)
+            end
+        end,
+        reset = function(frame, _, guid, auraID)
+            GPlaterNS.Utils:Log("effectHandlers.SCALE.reset: auraID=%d for guid=%s", 3, "auras", auraID, tostring(guid))
+        end
+    },
+    FLASH = {
+        apply = function(frame, cfg, guid)
+            if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_FLASH then 
+                EffectUtils.FlashEffect:Apply(frame)
+            end
+        end,
+        reset = function(frame, _, guid, auraID)
+            GPlaterNS.Utils:Log("effectHandlers.FLASH.reset: auraID=%d for guid=%s", 3, "auras", auraID, tostring(guid))
+        end
+    },
+    TOP = {
+        apply = function(frame, cfg, guid)
+            if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_TOP then 
+                EffectUtils.LevelEffect:Apply(frame, GPlaterNS.Constants.EFFECT_TYPE_TOP, guid)
+            end
+        end,
+        reset = function(frame, _, guid, auraID)
+            GPlaterNS.Utils:Log("effectHandlers.TOP.reset: auraID=%d for guid=%s", 3, "auras", auraID, tostring(guid))
+        end
+    },
+    LOW = {
+        apply = function(frame, cfg, guid)
+            if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_LOW then 
+                EffectUtils.LevelEffect:Apply(frame, GPlaterNS.Constants.EFFECT_TYPE_LOW, guid)
+            end
+        end,
+        reset = function(frame, _, guid, auraID)
+            GPlaterNS.Utils:Log("effectHandlers.LOW.reset: auraID=%d for guid=%s", 3, "auras", auraID, tostring(guid))
+        end
+    },
+    HIDE = {
+        apply = function(frame, cfg, guid, auraData)
+            if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_HIDE then
+                EffectUtils.HideEffect:Apply(frame, guid, cfg.auraID, GetTime(), auraData.expirationTime or math.huge)
+            end
+        end,
+        reset = function(frame, _, guid, auraID)
+            GPlaterNS.Utils:Log("effectHandlers.HIDE.reset: auraID=%s for guid=%s", 3, "auras", tostring(auraID), tostring(guid))
+            EffectUtils.HideEffect:Reset(frame, guid, auraID)
+        end
+    },
+    UNIQUE = {
+        apply = function(frame, cfg, guid, auraData)
+            if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_UNIQUE then
+                GPlaterNS.State.UnitsMarkedAsUniqueByGPlater[guid] = {
+                    auraID = cfg.auraID,
+                    applicationTime = GetTime(),
+                    sourceFrame = frame
+                }
+                GPlaterNS.Utils:Log("EffectHandlers.UNIQUE.apply: Registered for aura %d on %s", 2, "auras", cfg.auraID, tostring(guid))
+                if not frame:IsForbidden() then frame:Show() end
+                GPlaterNS.State.HiddenNameplates[guid] = nil
+    
+                -- 隐藏没有 UNIQUE 特效的姓名板
+                for _, plate in ipairs(C_NamePlate.GetNamePlates()) do
+                    if plate.unitFrame and plate.unitFrame.namePlateUnitToken then
+                        local otherUnit = plate.unitFrame.namePlateUnitToken
+                        local otherGUID = UnitGUID(otherUnit)
+                        if otherGUID and otherGUID ~= guid and UnitCanAttack("player", otherUnit) then
+                            if not GPlaterNS.State.UnitsMarkedAsUniqueByGPlater[otherGUID] then
+                                local otherFrame = plate.unitFrame
+                                if not otherFrame:IsForbidden() then
+                                    GPlaterNS.State.HiddenNameplates[otherGUID] = GPlaterNS.State.HiddenNameplates[otherGUID] or {}
+                                    GPlaterNS.State.HiddenNameplates[otherGUID]["UNIQUE_EFFECT_FROM_" .. guid] = {
+                                        effectType = "HIDE_BY_UNIQUE",
+                                        sourceGUID = guid,
+                                        auraID = cfg.auraID
+                                    }
+                                    otherFrame:Hide()
+                                    GPlaterNS.Utils:Log("EffectHandlers.UNIQUE.apply: Hiding %s due to %s", 3, "auras", tostring(otherGUID), tostring(guid))
+                                end
+                            end
+                        end
                     end
                 end
-                break
             end
-        end
-    end)
-
-    for _, auraID in ipairs(auraIDs) do
-        if not auraMatches[auraID].found then
-            allAurasFound = false
-            break
-        end
-    end
-
-    local stacksMatch = true
-    if allAurasFound and requiredStacks then
-        for _, auraID in ipairs(auraIDs) do
-            if auraMatches[auraID].stacks ~= requiredStacks then
-                stacksMatch = false
-                break
+        end,
+        reset = function(frame, unitType, guid, auraID)
+            if GPlaterNS.State.UnitsMarkedAsUniqueByGPlater[guid] then
+                local storedAuraID = GPlaterNS.State.UnitsMarkedAsUniqueByGPlater[guid].auraID
+                GPlaterNS.State.UnitsMarkedAsUniqueByGPlater[guid] = nil
+                GPlaterNS.Utils:Log("EffectHandlers.UNIQUE.reset: Cleared for guid %s, auraID=%s", 2, "auras", tostring(guid), tostring(auraID or storedAuraID or "nil"))
+                for otherGUID, np in pairs(GPlaterNS.State.Nameplates) do
+                    if np.frame and not np.frame:IsForbidden() then
+                        GPlaterNS.State.HiddenNameplates[otherGUID] = GPlaterNS.State.HiddenNameplates[otherGUID] or {}
+                        if GPlaterNS.State.HiddenNameplates[otherGUID]["UNIQUE_EFFECT_FROM_" .. guid] then
+                            GPlaterNS.State.HiddenNameplates[otherGUID]["UNIQUE_EFFECT_FROM_" .. guid] = nil
+                            if not next(GPlaterNS.State.HiddenNameplates[otherGUID]) then
+                                GPlaterNS.State.HiddenNameplates[otherGUID] = nil
+                            end
+                        end
+                        GPlaterNS.NameplateManager:UpdateAndApplyAllEffects(otherGUID)
+                    end
+                end
+            else
+                GPlaterNS.Utils:Log("EffectHandlers.UNIQUE.reset: No UNIQUE state for guid %s", 3, "auras", tostring(guid))
             end
+            GPlaterNS.NameplateManager:UpdateAndApplyAllEffects(guid)
         end
-    end
+    }
+}
 
-    return allAurasFound and stacksMatch, below30Percent
-end
-
--- Reset colors and effects
-local function ResetColors(unitFrame)
-    if not unitFrame or not unitFrame.unit then return end
-
-    local unit = unitFrame.unit
-    local currentAlpha = unitFrame:GetAlpha() or 1 -- Preserve Plater's alpha
-    local npcColor = Plater.GetNpcColor(unitFrame)
-    if npcColor then
-        Plater.SetNameplateColor(unitFrame, npcColor.r, npcColor.g, npcColor.b, currentAlpha)
-    elseif unitFrame.ActorType == "enemyplayer" then
-        Plater.FindAndSetNameplateColor(unitFrame) -- Will respect Plater's alpha
-    else
-        Plater.RefreshNameplateColor(unitFrame) -- Will respect Plater's alpha
-    end
-
-    Plater.SetBorderColor(unitFrame)
-
-    if unitFrame.healthBar and unitFrame.healthBar.unitName then
-        local defaultTextColor = GPlaterDB.AuraColoring.DefaultTextColors and GPlaterDB.AuraColoring.DefaultTextColors[unitFrame.ActorType] or {1, 1, 1, 1}
-        unitFrame.healthBar.unitName:SetTextColor(unpack(defaultTextColor))
-    end
-
-    if unitFrame.flashAnimation then
-        unitFrame.flashAnimation:Stop()
-        unitFrame.flashAnimation = nil
-    end
-
-    unitFrame:Show()
-end
-
--- Create flash animation
-local function CreateFlashAnimation(unitFrame)
-    if unitFrame.flashAnimation then return end
-    local ag = unitFrame:CreateAnimationGroup()
-    local fadeIn = ag:CreateAnimation("Alpha")
-    fadeIn:SetFromAlpha(1)
-    fadeIn:SetToAlpha(0.5)
-    fadeIn:SetDuration(0.3)
-    local fadeOut = ag:CreateAnimation("Alpha")
-    fadeOut:SetFromAlpha(0.5)
-    fadeOut:SetToAlpha(1)
-    fadeOut:SetDuration(0.3)
-    ag:SetLooping("REPEAT")
-    unitFrame.flashAnimation = ag
-    ag:Play()
-end
-
--- Check aura matches and apply colors
-local function CheckAuraMatches(unitFrame)
-    if not unitFrame or not unitFrame.unit then return false end
-
-    local unit = unitFrame.unit
-    if not GPlaterDB.AuraColoring.EnableAuraColoring or (not GPlaterDB.AuraColoring.UseInPvP and InPvP(unit)) or not GPlaterDB.AuraColoring.FilteredBuffsToMatch then
-        if unitFrame._gPlaterModified then
-            ResetColors(unitFrame)
-            unitFrame._gPlaterModified = nil
-        end
+function EffectUtils:ValidateUnitFrame(uF, effectType)
+    if not uF or not uF:IsShown() or not uF.namePlateUnitToken or not UnitExists(uF.namePlateUnitToken) then
+        GPlaterNS.Utils:Log("ValidateUnitFrame: invalid unit frame, effectType=%s", 4, "auras")
         return false
     end
-
-    local bestEntry, bestPriority = nil, -1
-    for _, config in ipairs(GPlaterDB.AuraColoring.FilteredBuffsToMatch) do
-        local aurasMatch, below30Percent = CheckAurasAndStacks(unit, config.auras, config.stacks)
-        if aurasMatch and not (GPlaterDB.AuraColoring.ResetAt30Percent and below30Percent) then
-            local priority = #config.auras * 1000 + (config.stacks or 0)
-            if priority > bestPriority then
-                bestEntry = config
-                bestPriority = priority
-            end
-        end
-    end
-
-    if not bestEntry then
-        if unitFrame._gPlaterModified then
-            ResetColors(unitFrame)
-            unitFrame._gPlaterModified = nil
-        end
-        return false
-    end
-
-    if bestEntry.hideNameplate then
-        unitFrame:SetAlpha(0)
-        unitFrame._gPlaterModified = true
-        return true
-    end
-
-    local currentAlpha = unitFrame:GetAlpha() or 1
-    if bestEntry.nameplateColor then
-        local r, g, b = 1, 1, 1
-        if bestEntry.nameplateColor:match("^#") then
-            r = tonumber(bestEntry.nameplateColor:sub(2, 3), 16) / 255
-            g = tonumber(bestEntry.nameplateColor:sub(4, 5), 16) / 255
-            b = tonumber(bestEntry.nameplateColor:sub(6, 7), 16) / 255
-        end
-        Plater.SetNameplateColor(unitFrame, r, g, b, currentAlpha)
-        unitFrame._gPlaterModified = true
-    end
-    if bestEntry.borderColor then
-        local r, g, b = 1, 1, 1
-        if bestEntry.borderColor:match("^#") then
-            r = tonumber(bestEntry.borderColor:sub(2, 3), 16) / 255
-            g = tonumber(bestEntry.borderColor:sub(4, 5), 16) / 255
-            b = tonumber(bestEntry.borderColor:sub(6, 7), 16) / 255
-        end
-        Plater.SetBorderColor(unitFrame, r, g, b)
-        unitFrame._gPlaterModified = true
-    end
-    if bestEntry.nameTextColor and unitFrame.healthBar and unitFrame.healthBar.unitName then
-        local r, g, b = 1, 1, 1
-        if bestEntry.nameTextColor:match("^#") then
-            r = tonumber(bestEntry.nameTextColor:sub(2, 3), 16) / 255
-            g = tonumber(bestEntry.nameTextColor:sub(4, 5), 16) / 255
-            b = tonumber(bestEntry.nameTextColor:sub(6, 7), 16) / 255
-        end
-        unitFrame.healthBar.unitName:SetTextColor(r, g, b)
-        unitFrame._gPlaterModified = true
-    end
-
-    if bestEntry.flash then
-        CreateFlashAnimation(unitFrame)
-        unitFrame._gPlaterModified = true
-    else
-        if unitFrame.flashAnimation then
-            unitFrame.flashAnimation:Stop()
-            unitFrame.flashAnimation = nil
-            unitFrame._gPlaterModified = true
-        end
-    end
-
     return true
 end
 
--- Update nameplate with throttling
-local LastUpdateAura = {}
-local THROTTLE_INTERVAL_AURA = 0.1
-local isUpdatingAura = {}
-
-local function UpdateAuraColoringNameplate(plateFrame, forceUpdate)
-    if not plateFrame or not plateFrame.unitFrame or not plateFrame.namePlateUnitToken then return end
-
-    local unitFrame = plateFrame.unitFrame
-    local unit = plateFrame.namePlateUnitToken
-    if isUpdatingAura[unit] then return end
-    isUpdatingAura[unit] = true
-
-    local now = GetTime()
-    LastUpdateAura[unit] = LastUpdateAura[unit] or 0
-    if not (forceUpdate or (now - LastUpdateAura[unit] >= THROTTLE_INTERVAL_AURA)) then
-        isUpdatingAura[unit] = false
-        return
+function EffectUtils:SafeExecute(func, uF, effectType, ...)
+    if not self:ValidateUnitFrame(uF, effectType) then 
+        GPlaterNS.Utils:Log("SafeExecute: invalid unit frame, effectType=%s", 4, "auras")
+        return false 
     end
-    LastUpdateAura[unit] = now
-
-    if not IsUnitAttackable(unit) then
-        isUpdatingAura[unit] = false
-        return
-    end
-
-    if GPlaterDB.AuraColoring.UseRaidMarks then
-        local markIndex = GetRaidTargetIndex(unit)
-        if markIndex and GPlaterDB.AuraColoring.ColorByMark[markIndex] then
-            local currentAlpha = unitFrame:GetAlpha() or 1 -- Preserve Plater's alpha
-            local r, g, b = 1, 1, 1
-            local hex = GPlaterDB.AuraColoring.ColorByMark[markIndex]
-            if hex:match("^#") then
-                r = tonumber(hex:sub(2, 3), 16) / 255
-                g = tonumber(hex:sub(4, 5), 16) / 255
-                b = tonumber(hex:sub(6, 7), 16) / 255
-            end
-            Plater.SetNameplateColor(unitFrame, r, g, b, currentAlpha)
-            Plater.SetBorderColor(unitFrame)
-            if unitFrame.healthBar and unitFrame.healthBar.unitName then
-                unitFrame.healthBar.unitName:SetTextColor(1, 1, 1)
-            end
-            if unitFrame.flashAnimation then
-                unitFrame.flashAnimation:Stop()
-                unitFrame.flashAnimation = nil
-            end
-            unitFrame:Show()
-            unitFrame._gPlaterModified = true
-            isUpdatingAura[unit] = false
-            C_Timer.After(60, function() isUpdatingAura[unit] = nil end)
-            return
-        end
-    end
-
-    CheckAuraMatches(unitFrame)
-    isUpdatingAura[unit] = false
-    C_Timer.After(60, function() isUpdatingAura[unit] = nil end)
+    local success, result = GPlaterNS.Utils:SafeCall(func, ...)
+    return success, result
 end
 
--- Event handling for auras
-local function OnUnitAura(event, unit)
-    if unit == "player" or not unit then return end
-    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-        if plateFrame and plateFrame.namePlateUnitToken and (plateFrame.namePlateUnitToken == unit or UnitGUID(plateFrame.namePlateUnitToken) == UnitGUID(unit)) then
-            UpdateAuraColoringNameplate(plateFrame, false)
-        end
+-- New: Centralized effect application
+function EffectUtils:ApplyEffects(frame, guid, effects, unitType)
+    GPlaterNS.Utils:Log("EffectUtils:ApplyEffects called for GUID: %s", 3, "nameplates", guid)
+    if effects.COLOR.healthBar then
+        GPlaterNS.Utils:Log("EFFECTS_ARG: HBColor: %s", 3, "nameplates", effects.COLOR.healthBar)
     end
-end
-
--- Hook Plater functions for aura coloring
-local function HookPlaterFunctions()
-    if Plater.RefreshNameplateColor then
-        hooksecurefunc(Plater, "RefreshNameplateColor", function(unitFrame)
-            if unitFrame.PlateFrame and unitFrame.PlateFrame.namePlateUnitToken and not isUpdatingAura[unitFrame.PlateFrame.namePlateUnitToken] then
-                UpdateAuraColoringNameplate(unitFrame.PlateFrame, true)
-            end
-        end)
+    if effects.SCALE then
+        GPlaterNS.Utils:Log("EFFECTS_ARG: Scale: %s", 3, "nameplates", tostring(effects.SCALE))
     end
-    if Plater.UpdateColor then
-        hooksecurefunc(Plater, "UpdateColor", function(unitFrame)
-            if unitFrame.PlateFrame and unitFrame.PlateFrame.namePlateUnitToken and not isUpdatingAura[unitFrame.PlateFrame.namePlateUnitToken] then
-                UpdateAuraColoringNameplate(unitFrame.PlateFrame, true)
-            end
-        end)
+    if effects.HIDE then
+        GPlaterNS.Utils:Log("EFFECTS_ARG: HIDE: true", 3, "nameplates")
     end
-    if Plater.SetPlateColor then
-        hooksecurefunc(Plater, "SetPlateColor", function(unitFrame, r, g, b)
-            if unitFrame.PlateFrame and unitFrame.PlateFrame.namePlateUnitToken and not isUpdatingAura[unitFrame.PlateFrame.namePlateUnitToken] then
-                UpdateAuraColoringNameplate(unitFrame.PlateFrame, true)
-            end
-        end)
-    end
-end
+    if not self:ValidateUnitFrame(frame, "effects") then return end
+    frame.GPlaterEffects = frame.GPlaterEffects or {}
 
--- Setup Plater hooks for aura coloring
-local function SetupPlaterHooks()
-    if not Plater or not Plater.db or not Plater.db.profile then return false end
-
-    local eventFrame = CreateFrame("Frame")
-    eventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-    eventFrame:RegisterEvent("UNIT_AURA")
-    eventFrame:RegisterEvent("RAID_TARGET_UPDATE")
-    eventFrame:RegisterEvent("UNIT_THREAT_LIST_UPDATE")
-    eventFrame:RegisterEvent("PLAYER_TARGET_CHANGED")
-    eventFrame:RegisterEvent("UNIT_FACTION")
-    eventFrame:RegisterEvent("UNIT_FLAGS")
-    eventFrame:SetScript("OnEvent", function(self, event, unit)
-        if event == "NAME_PLATE_UNIT_ADDED" or event == "RAID_TARGET_UPDATE" then
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateAuraColoringNameplate(plateFrame, true)
-                end
-            end
-        elseif event == "UNIT_AURA" or event == "UNIT_THREAT_LIST_UPDATE" or event == "UNIT_FACTION" or event == "UNIT_FLAGS" then
-            OnUnitAura(event, unit)
-        elseif event == "PLAYER_TARGET_CHANGED" then
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken and UnitIsUnit(plateFrame.namePlateUnitToken, "target") then
-                    UpdateAuraColoringNameplate(plateFrame, true)
-                    break
-                end
-            end
-        end
-    end)
-
-    HookPlaterFunctions()
-    return true
-end
-
--- Load default text colors from Plater
-local function LoadDefaultTextColors()
-    if not Plater or not Plater.db or not Plater.db.profile then return end
-
-    local profile = Plater.db.profile
-    GPlaterDB.AuraColoring.DefaultTextColors = {
-        enemynpc = profile.plate_config and profile.plate_config.enemynpc and profile.plate_config.enemynpc.name_color or {1, 1, 1, 1},
-        enemyplayer = profile.plate_config and profile.plate_config.enemyplayer and profile.plate_config.enemyplayer.name_color or {1, 1, 1, 1},
-        neutral = profile.plate_config and profile.plate_config.neutral and profile.plate_config.neutral.name_color or {1, 1, 1, 1}
-    }
-end
-
--- Filter buffs by player class, specialization, and learned skills
-local function FilterBuffsByClassAndSpec()
-    GPlaterDB.AuraColoring.BuffsToMatch = GPlaterDB.AuraColoring.BuffsToMatch or {}
-    local filteredBuffsToMatch = {}
-    local currentSpec = GetPlayerSpec()
-
-    for _, entry in ipairs(GPlaterDB.AuraColoring.BuffsToMatch) do
-        for _, auraID in ipairs(entry.auras) do
-            local auraInfo = AuraClassMap and AuraClassMap[auraID]
-            if auraInfo and auraInfo.class == PLAYER_CLASS and (auraInfo.spec == nil or auraInfo.spec == currentSpec) and IsSkillLearned(auraID) then
-                table.insert(filteredBuffsToMatch, entry)
-                break
-            end
-        end
-    end
-    GPlaterDB.AuraColoring.FilteredBuffsToMatch = filteredBuffsToMatch
-end
-
--- Initialize aura coloring
-local function UpdateAuraColoring()
-    LoadDefaultTextColors()
-    FilterBuffsByClassAndSpec()
-    C_Timer.After(5, function()
-        if not SetupPlaterHooks() then
-            C_Timer.After(5, SetupPlaterHooks)
-        end
-    end)
-end
-
--- Create Aura Coloring content
-local function CreateAuraColoringContent(parent)
-    if not parent then
-        local errorMsg = "Parent frame is nil"
-        local errorFrame = CreateFrame("Frame", nil, UIParent)
-        local errorText = errorFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        errorText:SetPoint("CENTER")
-        errorText:SetText(string.format(GPlaterL["MODULE_LOAD_ERROR"], "Aura Coloring", errorMsg))
-        return errorFrame
+    -- 如果 HIDE 效果激活，优先应用
+    if effects.HIDE then
+        self.HideEffect:Apply(frame, guid, effects.sourceAura.hide or "AGGREGATED_HIDE", GetTime(), math.huge)
+        frame.GPlaterEffects.hide = true
+        GPlaterNS.Utils:Log("ApplyEffects: HIDE is active for %s by aura %s", 3, "auras", tostring(guid), tostring(effects.sourceAura.hide))
+        return -- HIDE 优先，跳过其他效果
+    elseif frame.GPlaterEffects.hide then
+        self.HideEffect:ResetToBase(frame, guid)
+        frame.GPlaterEffects.hide = nil
     end
 
-    local contentFrame = CreateFrame("Frame", nil, parent)
-    contentFrame:SetSize(790, 550)
-
-    local success, errorMsg = pcall(function()
-        -- Enable Aura Coloring
-        local enableAuraColoringCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-        enableAuraColoringCheck:SetPoint("TOPLEFT", 20, -40)
-        enableAuraColoringCheck:SetSize(26, 26)
-        enableAuraColoringCheck.text:SetText(GPlaterL["ENABLE_AURA_COLORING"])
-        enableAuraColoringCheck:SetChecked(GPlaterDB.AuraColoring.EnableAuraColoring)
-        enableAuraColoringCheck:SetScript("OnClick", function(self)
-            GPlaterDB.AuraColoring.EnableAuraColoring = self:GetChecked()
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateAuraColoringNameplate(plateFrame, true)
-                end
-            end
-        end)
-
-        -- Use in PvP
-        local useInPvPCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-        useInPvPCheck:SetPoint("TOPLEFT", 20, -70)
-        useInPvPCheck:SetSize(26, 26)
-        useInPvPCheck.text:SetText(GPlaterL["USE_IN_PVP"])
-        useInPvPCheck:SetChecked(GPlaterDB.AuraColoring.UseInPvP)
-        useInPvPCheck:SetScript("OnClick", function(self)
-            GPlaterDB.AuraColoring.UseInPvP = self:GetChecked()
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateAuraColoringNameplate(plateFrame, true)
-                end
-            end
-        end)
-
-        -- Use Raid Marks
-        local useRaidMarksCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-        useRaidMarksCheck:SetPoint("TOPLEFT", 20, -100)
-        useRaidMarksCheck:SetSize(26, 26)
-        useRaidMarksCheck.text:SetText(GPlaterL["USE_RAID_MARKS"])
-        useRaidMarksCheck:SetChecked(GPlaterDB.AuraColoring.UseRaidMarks)
-
-        -- Reset at 30% Duration
-        local resetAt30PercentCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-        resetAt30PercentCheck:SetPoint("TOPLEFT", 20, -130)
-        resetAt30PercentCheck:SetSize(26, 26)
-        resetAt30PercentCheck.text:SetText(GPlaterL["RESET_AT_30_PERCENT"])
-        resetAt30PercentCheck:SetChecked(GPlaterDB.AuraColoring.ResetAt30Percent)
-        resetAt30PercentCheck:SetScript("OnClick", function(self)
-            GPlaterDB.AuraColoring.ResetAt30Percent = self:GetChecked()
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateAuraColoringNameplate(plateFrame, true)
-                end
-            end
-        end)
-
-        -- Raid Marks Frame
-        contentFrame.raidMarksFrame = CreateFrame("Frame", nil, contentFrame)
-        contentFrame.raidMarksFrame:SetPoint("LEFT", useRaidMarksCheck.text, "RIGHT", 10, 0)
-        contentFrame.raidMarksFrame:SetSize(500, 30)
-        contentFrame.raidMarksFrame:SetShown(GPlaterDB.AuraColoring.UseRaidMarks)
-
-        local raidIconTextures = {
-            "Interface\\TargetingFrame\\UI-RaidTargetingIcon_1", -- Star
-            "Interface\\TargetingFrame\\UI-RaidTargetingIcon_2", -- Circle
-            "Interface\\TargetingFrame\\UI-RaidTargetingIcon_3", -- Diamond
-            "Interface\\TargetingFrame\\UI-RaidTargetingIcon_4", -- Triangle
-            "Interface\\TargetingFrame\\UI-RaidTargetingIcon_5", -- Moon
-            "Interface\\TargetingFrame\\UI-RaidTargetingIcon_6", -- Square
-            "Interface\\TargetingFrame\\UI-RaidTargetingIcon_7", -- Cross
-            "Interface\\TargetingFrame\\UI-RaidTargetingIcon_8"  -- Skull
-        }
-
-        for i = 1, 8 do
-            local icon = contentFrame.raidMarksFrame:CreateTexture(nil, "OVERLAY")
-            icon:SetTexture(raidIconTextures[i])
-            icon:SetSize(18, 18)
-            icon:SetPoint("LEFT", (i - 1) * 60, 0)
-
-            local colorButton = CreateFrame("Button", nil, contentFrame.raidMarksFrame)
-            colorButton:SetPoint("LEFT", icon, "RIGHT", 5, 0)
-            colorButton:SetSize(27, 27)
-            colorButton:SetNormalTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-            local function UpdateColor(r, g, b)
-                local hex = string.format("#%02x%02x%02x", r * 255, g * 255, b * 255)
-                GPlaterDB.AuraColoring.ColorByMark[i] = hex
-                colorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                    if plateFrame and plateFrame.namePlateUnitToken then
-                        UpdateAuraColoringNameplate(plateFrame, true)
-                    end
-                end
-            end
-            colorButton:SetScript("OnClick", function(self, button)
-                if button == "LeftButton" then
-                    local currentColor = GPlaterDB.AuraColoring.ColorByMark[i] or "#ffffff"
-                    local r, g, b = 1, 1, 1
-                    if currentColor:match("^#") then
-                        r = tonumber(currentColor:sub(2, 3), 16) / 255
-                        g = tonumber(currentColor:sub(4, 5), 16) / 255
-                        b = tonumber(currentColor:sub(6, 7), 16) / 255
-                    end
-                    ColorPickerFrame:SetupColorPickerAndShow({
-                        r = r, g = g, b = b, a = 1,
-                        swatchFunc = function()
-                            local r, g, b = ColorPickerFrame:GetColorRGB()
-                            UpdateColor(r, g, b)
-                        end,
-                        cancelFunc = function()
-                            colorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                        end
-                    })
-                end
-            end)
-            local currentColor = GPlaterDB.AuraColoring.ColorByMark[i] or "#ffffff"
-            if currentColor:match("^#") then
-                local r = tonumber(currentColor:sub(2, 3), 16) / 255
-                local g = tonumber(currentColor:sub(4, 5), 16) / 255
-                local b = tonumber(currentColor:sub(6, 7), 16) / 255
-                colorButton:GetNormalTexture():SetVertexColor(r, g, b)
-            end
-        end
-
-        useRaidMarksCheck:SetScript("OnClick", function(self)
-            GPlaterDB.AuraColoring.UseRaidMarks = self:GetChecked()
-            contentFrame.raidMarksFrame:SetShown(self:GetChecked())
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateAuraColoringNameplate(plateFrame, true)
-                end
-            end
-        end)
-
-        -- Aura Table
-        local auraTableFrame = CreateFrame("ScrollFrame", nil, contentFrame, "UIPanelScrollFrameTemplate")
-        auraTableFrame:SetPoint("TOPLEFT", 10, -170)
-        auraTableFrame:SetPoint("BOTTOMRIGHT", -10, 60)
-        auraTableFrame:SetClipsChildren(true)
-        local auraTableContent = CreateFrame("Frame", nil, auraTableFrame)
-        auraTableContent:SetSize(790, math.max(400, (#(GPlaterDB.AuraColoring.BuffsToMatch or {}) + 1) * 24 + 30))
-        auraTableFrame:SetScrollChild(auraTableContent)
-        contentFrame.auraTableContent = auraTableContent
-
-        local headers = {
-            GPlaterL["AURA_ID"],
-            GPlaterL["AURA_NAME"],
-            GPlaterL["STACKS"],
-            GPlaterL["NAME_TEXT"],
-            GPlaterL["NAMEPLATE"],
-            GPlaterL["BORDER"],
-            GPlaterL["FLASH"],
-            ""
-        }
-        local columnWidths = {
-            110, -- AURA_ID
-            165, -- AURA_NAME
-            88,  -- STACKS
-            55,  -- NAME_TEXT
-            55,  -- NAMEPLATE
-            55,  -- BORDER
-            55,  -- FLASH
-            66   -- DELETE
-        }
-        local totalWidth = 0
-        for _, width in ipairs(columnWidths) do
-            totalWidth = totalWidth + width
-        end
-        local leftOffset = (790 - totalWidth) / 2
-
-        local function CreateTableHeaders()
-            local offset = leftOffset
-            for i, header in ipairs(headers) do
-                local label = auraTableContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-                label:SetPoint("TOPLEFT", offset, -10)
-                label:SetSize(columnWidths[i], 20)
-                label:SetText(header)
-                offset = offset + columnWidths[i]
-            end
-        end
-
-        local function UpdateAuraTable()
-            if auraTableContent.rows then
-                for _, row in ipairs(auraTableContent.rows) do
-                    for _, widget in ipairs(row) do
-                        widget:Hide()
-                        widget:ClearAllPoints()
-                    end
-                end
-            end
-            auraTableContent.rows = {}
-
-            GPlaterDB.AuraColoring.BuffsToMatch = GPlaterDB.AuraColoring.BuffsToMatch or {}
-
-            local classBuffs, otherBuffs = {}, {}
-            for i, entry in ipairs(GPlaterDB.AuraColoring.BuffsToMatch) do
-                local isClassAura = false
-                for _, auraID in ipairs(entry.auras) do
-                    local auraInfo = AuraClassMap and AuraClassMap[auraID]
-                    if auraInfo and auraInfo.class == PLAYER_CLASS then
-                        isClassAura = true
-                        break
-                    end
-                end
-                table.insert(isClassAura and classBuffs or otherBuffs, { index = i, entry = entry })
-            end
-
-            local sortedBuffs = {}
-            for _, buff in ipairs(classBuffs) do table.insert(sortedBuffs, buff) end
-            for _, buff in ipairs(otherBuffs) do table.insert(sortedBuffs, buff) end
-
-            for rowIndex, buff in ipairs(sortedBuffs) do
-                local i = buff.index
-                local entry = buff.entry
-                local row = {}
-                local offset = leftOffset
-                local isClassAura = false
-                for _, auraID in ipairs(entry.auras) do
-                    local auraInfo = AuraClassMap and AuraClassMap[auraID]
-                    if auraInfo and auraInfo.class == PLAYER_CLASS then
-                        isClassAura = true
-                        break
-                    end
-                end
-
-                -- Aura ID
-                local idEdit = CreateFrame("EditBox", nil, auraTableContent, "InputBoxTemplate")
-                idEdit:SetPoint("TOPLEFT", offset + 5, -30 - (rowIndex * 24))
-                idEdit:SetSize(columnWidths[1] - 10, 20)
-                idEdit:SetAutoFocus(false)
-                idEdit:SetText(table.concat(entry.auras, ","))
-                idEdit:SetTextColor(isClassAura and 1 or 0.5, isClassAura and 1 or 0.5, isClassAura and 1 or 0.5)
-                idEdit:SetJustifyH("LEFT")
-                idEdit:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
-                idEdit:SetScript("OnEditFocusLost", function(self)
-                    local text = self:GetText():trim()
-                    local auras = {}
-                    local invalidIDs = {}
-                    for id in text:gmatch("%d+") do
-                        local spellID = tonumber(id)
-                        if spellID and C_Spell.GetSpellName(spellID) then
-                            table.insert(auras, spellID)
-                        else
-                            table.insert(invalidIDs, id)
-                        end
-                    end
-                    if #invalidIDs > 0 then
-                        print(string.format("|cFFFF0000GPlater: %s|r", string.format(GPlaterL["INVALID_SPELL_ID"], table.concat(invalidIDs, ", "))))
-                    end
-                    entry.auras = #auras > 0 and auras or entry.auras
-                    local name = ""
-                    for _, id in ipairs(entry.auras) do
-                        local spellName = C_Spell.GetSpellName(id) or "Unknown"
-                        name = name .. spellName .. ","
-                    end
-                    row[2]:SetText(name ~= "" and name:sub(1, -2) or "Unknown")
-                    local isClassAuraCheck = false
-                    for _, auraID in ipairs(entry.auras) do
-                        local auraInfo = AuraClassMap and AuraClassMap[auraID]
-                        if auraInfo and auraInfo.class == PLAYER_CLASS then
-                            isClassAuraCheck = true
+    -- 应用 UNIQUE 效果
+    if effects.UNIQUE then
+        local uniqueKey = effects.sourceAura.unique
+        if uniqueKey and GPlaterNS.State.auraConfig[uniqueKey] then
+            local cfgEntry = GPlaterNS.State.auraConfig[uniqueKey]
+            local cfg = cfgEntry.config
+            if cfg and cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_UNIQUE then
+                local auraData = nil
+                if cfgEntry.isCombination then
+                    for _, reqID in ipairs(cfgEntry.requiredIDs) do
+                        if GPlaterNS.State.ActiveAuras[guid] and GPlaterNS.State.ActiveAuras[guid][reqID] then
+                            auraData = GPlaterNS.State.ActiveAuras[guid][reqID]
                             break
                         end
                     end
-                    row[2]:SetTextColor(isClassAuraCheck and 1 or 0.5, isClassAuraCheck and 1 or 0.5, isClassAuraCheck and 1 or 0.5)
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateAuraColoringNameplate(plateFrame, true)
-                        end
-                    end
-                end)
-                idEdit:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-                row[1] = idEdit
-                offset = offset + columnWidths[1]
-
-                -- Aura Name
-                local nameText = auraTableContent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-                nameText:SetPoint("TOPLEFT", offset + 5, -30 - (rowIndex * 24))
-                nameText:SetSize(columnWidths[2] - 10, 20)
-                nameText:SetJustifyH("LEFT")
-                local name = ""
-                for _, id in ipairs(entry.auras) do
-                    local spellName = C_Spell.GetSpellName(id) or "Unknown"
-                    name = name .. spellName .. ","
-                end
-                nameText:SetText(name ~= "" and name:sub(1, -2) or "Unknown")
-                nameText:SetTextColor(isClassAura and 1 or 0.5, isClassAura and 1 or 0.5, isClassAura and 1 or 0.5)
-                row[2] = nameText
-                offset = offset + columnWidths[2]
-
-                -- Stacks
-                local stacksEdit = CreateFrame("EditBox", nil, auraTableContent, "InputBoxTemplate")
-                stacksEdit:SetPoint("TOPLEFT", offset + 5, -30 - (rowIndex * 24))
-                stacksEdit:SetSize(columnWidths[3] - 10, 20)
-                stacksEdit:SetAutoFocus(false)
-                stacksEdit:SetText(entry.stacks and tostring(entry.stacks) or GPlaterL["STACKS_NOT_CHECKED"])
-                stacksEdit:SetTextColor(isClassAura and 1 or 0.5, isClassAura and 1 or 0.5, isClassAura and 1 or 0.5)
-                stacksEdit:SetJustifyH("CENTER")
-                stacksEdit:SetScript("OnEditFocusGained", function(self)
-                    if self:GetText() == GPlaterL["STACKS_NOT_CHECKED"] then self:SetText("") end
-                    self:HighlightText()
-                end)
-                stacksEdit:SetScript("OnEditFocusLost", function(self)
-                    local text = self:GetText():trim()
-                    if text == "" or text == GPlaterL["STACKS_NOT_CHECKED"] then
-                        entry.stacks = nil
-                        self:SetText(GPlaterL["STACKS_NOT_CHECKED"])
-                    else
-                        local value = tonumber(text)
-                        if value then
-                            entry.stacks = math.floor(value)
-                            self:SetText(tostring(entry.stacks))
-                        else
-                            self:SetText(GPlaterL["STACKS_NOT_CHECKED"])
-                        end
-                    end
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateAuraColoringNameplate(plateFrame, true)
-                        end
-                    end
-                end)
-                stacksEdit:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-                row[3] = stacksEdit
-                offset = offset + columnWidths[3]
-
-                -- Name Text Color
-                local nameColorButton = CreateFrame("Button", nil, auraTableContent)
-                nameColorButton:SetPoint("TOPLEFT", offset + (columnWidths[4] - 27) / 2, -30 - (rowIndex * 24))
-                nameColorButton:SetSize(27, 27)
-                nameColorButton:SetNormalTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                local function UpdateNameColor(r, g, b)
-                    local hex = string.format("#%02x%02x%02x", r * 255, g * 255, b * 255)
-                    entry.nameTextColor = hex
-                    nameColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                    nameColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-                    nameColorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateAuraColoringNameplate(plateFrame, true)
-                        end
-                    end
-                end
-                nameColorButton:SetScript("OnMouseUp", function(self, button)
-                    if button == "LeftButton" then
-                        local currentColor = entry.nameTextColor or "#ffffff"
-                        local r, g, b = 1, 1, 1
-                        if currentColor:match("^#") then
-                            r = tonumber(currentColor:sub(2, 3), 16) / 255
-                            g = tonumber(currentColor:sub(4, 5), 16) / 255
-                            b = tonumber(currentColor:sub(6, 7), 16) / 255
-                        end
-                        ColorPickerFrame:SetupColorPickerAndShow({
-                            r = r, g = g, b = b, a = 1,
-                            swatchFunc = function()
-                                local r, g, b = ColorPickerFrame:GetColorRGB()
-                                UpdateNameColor(r, g, b)
-                            end,
-                            cancelFunc = function()
-                                nameColorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                            end
-                        })
-                    elseif button == "RightButton" then
-                        if entry.nameTextColor then
-                            entry.nameTextColor = nil
-                            nameColorButton:GetNormalTexture():SetTexture("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up")
-                            nameColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-                        else
-                            entry.nameTextColor = "#ffffff"
-                            nameColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                            nameColorButton:GetNormalTexture():SetVertexColor(1, 1, 1)
-                        end
-                        for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                            if plateFrame and plateFrame.namePlateUnitToken then
-                                UpdateAuraColoringNameplate(plateFrame, true)
-                            end
-                        end
-                    end
-                end)
-                if entry.nameTextColor then
-                    local r, g, b = 1, 1, 1
-                    if entry.nameTextColor:match("^#") then
-                        r = tonumber(entry.nameTextColor:sub(2, 3), 16) / 255
-                        g = tonumber(entry.nameTextColor:sub(4, 5), 16) / 255
-                        b = tonumber(entry.nameTextColor:sub(6, 7), 16) / 255
-                    end
-                    nameColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                    nameColorButton:GetNormalTexture():SetVertexColor(r, g, b)
                 else
-                    nameColorButton:GetNormalTexture():SetTexture("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up")
-                    nameColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+                    local spellID = cfgEntry.requiredIDs[1]
+                    auraData = GPlaterNS.State.ActiveAuras[guid] and GPlaterNS.State.ActiveAuras[guid][spellID]
                 end
-                row[4] = nameColorButton
-                offset = offset + columnWidths[4]
-
-                -- Nameplate Color
-                local plateColorButton = CreateFrame("Button", nil, auraTableContent)
-                plateColorButton:SetPoint("TOPLEFT", offset + (columnWidths[5] - 27) / 2, -30 - (rowIndex * 24))
-                plateColorButton:SetSize(27, 27)
-                plateColorButton:SetNormalTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                local function UpdatePlateColor(r, g, b)
-                    local hex = string.format("#%02x%02x%02x", r * 255, g * 255, b * 255)
-                    entry.nameplateColor = hex
-                    plateColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                    plateColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-                    plateColorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateAuraColoringNameplate(plateFrame, true)
-                        end
-                    end
-                end
-                plateColorButton:SetScript("OnMouseUp", function(self, button)
-                    if button == "LeftButton" then
-                        local currentColor = entry.nameplateColor or "#ffffff"
-                        local r, g, b = 1, 1, 1
-                        if currentColor:match("^#") then
-                            r = tonumber(currentColor:sub(2, 3), 16) / 255
-                            g = tonumber(currentColor:sub(4, 5), 16) / 255
-                            b = tonumber(currentColor:sub(6, 7), 16) / 255
-                        end
-                        ColorPickerFrame:SetupColorPickerAndShow({
-                            r = r, g = g, b = b, a = 1,
-                            swatchFunc = function()
-                                local r, g, b = ColorPickerFrame:GetColorRGB()
-                                UpdatePlateColor(r, g, b)
-                            end,
-                            cancelFunc = function()
-                                plateColorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                            end
-                        })
-                    elseif button == "RightButton" then
-                        if entry.nameplateColor then
-                            entry.nameplateColor = nil
-                            plateColorButton:GetNormalTexture():SetTexture("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up")
-                            plateColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-                        else
-                            entry.nameplateColor = "#ffffff"
-                            plateColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                            plateColorButton:GetNormalTexture():SetVertexColor(1, 1, 1)
-                        end
-                        for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                            if plateFrame and plateFrame.namePlateUnitToken then
-                                UpdateAuraColoringNameplate(plateFrame, true)
-                            end
-                        end
-                    end
-                end)
-                if entry.nameplateColor then
-                    local r, g, b = 1, 1, 1
-                    if entry.nameplateColor:match("^#") then
-                        r = tonumber(entry.nameplateColor:sub(2, 3), 16) / 255
-                        g = tonumber(entry.nameplateColor:sub(4, 5), 16) / 255
-                        b = tonumber(entry.nameplateColor:sub(6, 7), 16) / 255
-                    end
-                    plateColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                    plateColorButton:GetNormalTexture():SetVertexColor(r, g, b)
+                if auraData then
+                    GPlaterNS.Utils:Log("ApplyEffects: Applying UNIQUE effect for GUID %s with key %s", 2, "auras", guid, uniqueKey)
+                    self.effectHandlers.UNIQUE.apply(frame, cfg, guid, auraData)
+                    frame.GPlaterEffects.unique = true
+                    frame.GPlaterEffects.uniqueAuraID = cfg.auraID
                 else
-                    plateColorButton:GetNormalTexture():SetTexture("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up")
-                    plateColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
+                    GPlaterNS.Utils:Log("ApplyEffects: Skipping UNIQUE effect for key %s on GUID %s due to missing auraData", 3, "auras", uniqueKey, guid)
+                    frame.GPlaterEffects.unique = false
+                    frame.GPlaterEffects.uniqueAuraID = nil
                 end
-                row[5] = plateColorButton
-                offset = offset + columnWidths[5]
-
-                -- Border Color
-                local borderColorButton = CreateFrame("Button", nil, auraTableContent)
-                borderColorButton:SetPoint("TOPLEFT", offset + (columnWidths[6] - 27) / 2, -30 - (rowIndex * 24))
-                borderColorButton:SetSize(27, 27)
-                borderColorButton:SetNormalTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                local function UpdateBorderColor(r, g, b)
-                    local hex = string.format("#%02x%02x%02x", r * 255, g * 255, b * 255)
-                    entry.borderColor = hex
-                    borderColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                    borderColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-                    borderColorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateAuraColoringNameplate(plateFrame, true)
-                        end
-                    end
-                end
-                borderColorButton:SetScript("OnMouseUp", function(self, button)
-                    if button == "LeftButton" then
-                        local currentColor = entry.borderColor or "#ffffff"
-                        local r, g, b = 1, 1, 1
-                        if currentColor:match("^#") then
-                            r = tonumber(currentColor:sub(2, 3), 16) / 255
-                            g = tonumber(currentColor:sub(4, 5), 16) / 255
-                            b = tonumber(currentColor:sub(6, 7), 16) / 255
-                        end
-                        ColorPickerFrame:SetupColorPickerAndShow({
-                            r = r, g = g, b = b, a = 1,
-                            swatchFunc = function()
-                                local r, g, b = ColorPickerFrame:GetColorRGB()
-                                UpdateBorderColor(r, g, b)
-                            end,
-                            cancelFunc = function()
-                                borderColorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                            end
-                        })
-                    elseif button == "RightButton" then
-                        if entry.borderColor then
-                            entry.borderColor = nil
-                            borderColorButton:GetNormalTexture():SetTexture("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up")
-                            borderColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-                        else
-                            entry.borderColor = "#ffffff"
-                            borderColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                            borderColorButton:GetNormalTexture():SetVertexColor(1, 1, 1)
-                        end
-                        for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                            if plateFrame and plateFrame.namePlateUnitToken then
-                                UpdateAuraColoringNameplate(plateFrame, true)
-                            end
-                        end
-                    end
-                end)
-                if entry.borderColor then
-                    local r, g, b = 1, 1, 1
-                    if entry.borderColor:match("^#") then
-                        r = tonumber(entry.borderColor:sub(2, 3), 16) / 255
-                        g = tonumber(entry.borderColor:sub(4, 5), 16) / 255
-                        b = tonumber(entry.borderColor:sub(6, 7), 16) / 255
-                    end
-                    borderColorButton:GetNormalTexture():SetTexture("Interface\\ChatFrame\\ChatFrameColorSwatch")
-                    borderColorButton:GetNormalTexture():SetVertexColor(r, g, b)
-                else
-                    borderColorButton:GetNormalTexture():SetTexture("Interface\\BUTTONS\\UI-GroupLoot-Pass-Up")
-                    borderColorButton:GetNormalTexture():SetTexCoord(0, 1, 0, 1)
-                end
-                row[6] = borderColorButton
-                offset = offset + columnWidths[6]
-
-                -- Flash
-                local flashCheck = CreateFrame("CheckButton", nil, auraTableContent, "UICheckButtonTemplate")
-                flashCheck:SetPoint("TOPLEFT", offset + (columnWidths[7] - 27) / 2, -30 - (rowIndex * 24))
-                flashCheck:SetSize(27, 27)
-                flashCheck:SetChecked(entry.flash)
-                flashCheck:SetScript("OnClick", function(self)
-                    entry.flash = self:GetChecked()
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateAuraColoringNameplate(plateFrame, true)
-                        end
-                    end
-                end)
-                row[7] = flashCheck
-                offset = offset + columnWidths[7]
-
-                -- Delete
-                local deleteButton = CreateFrame("Button", nil, auraTableContent, "UIPanelButtonTemplate")
-                deleteButton:SetPoint("TOPLEFT", offset + (columnWidths[8] - 50) / 2, -30 - (rowIndex * 24))
-                deleteButton:SetSize(columnWidths[8] - 10, 20)
-                deleteButton:SetText(GPlaterL["DELETE"])
-                deleteButton:SetScript("OnClick", function()
-                    table.remove(GPlaterDB.AuraColoring.BuffsToMatch, i)
-                    UpdateAuraTable()
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateAuraColoringNameplate(plateFrame, true)
-                        end
-                    end
-                end)
-                row[8] = deleteButton
-
-                -- Create a backdrop frame for the row
-                local rowFrame = CreateFrame("Frame", nil, auraTableContent, "BackdropTemplate")
-                rowFrame:SetPoint("TOPLEFT", leftOffset, -30 - (rowIndex * 24))
-                rowFrame:SetSize(totalWidth, 24)
-                rowFrame:SetBackdrop({
-                    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-                    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-                    tile = true, tileSize = 16, edgeSize = 8,
-                    insets = { left = 2, right = 2, top = 2, bottom = 2 }
-                })
-                rowFrame:SetBackdropColor(0, 0, 0, 0.5)
-                rowFrame:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
-
-                auraTableContent.rows[rowIndex] = row
-            end
-
-            -- Add button in the last row of Aura ID column
-            local addButton = auraTableContent.addButton or CreateFrame("Button", nil, auraTableContent, "UIPanelButtonTemplate")
-            auraTableContent.addButton = addButton
-            addButton:SetPoint("TOPLEFT", leftOffset + 5, -30 - ((#sortedBuffs + 1) * 24))
-            addButton:SetSize(90, 22)
-            addButton:SetText(GPlaterL["ADD_AURA"])
-            addButton:Show()
-            addButton:SetScript("OnClick", function()
-                table.insert(GPlaterDB.AuraColoring.BuffsToMatch, { auras = {}, flash = false, stacks = nil })
-                UpdateAuraTable()
-            end)
-
-            auraTableContent:SetHeight((#GPlaterDB.AuraColoring.BuffsToMatch + 2) * 24 + 30)
-        end
-
-        contentFrame.CreateTableHeaders = CreateTableHeaders
-        contentFrame.UpdateAuraTable = UpdateAuraTable
-        contentFrame:CreateTableHeaders()
-        contentFrame:UpdateAuraTable()
-    end)
-
-    if not success then
-        contentFrame:Hide()
-        local errorFrame = CreateFrame("Frame", nil, parent)
-        local errorText = errorFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        errorText:SetPoint("CENTER")
-        errorText:SetText(string.format(GPlaterL["MODULE_LOAD_ERROR"], "Aura Coloring", errorMsg))
-        return errorFrame
-    end
-
-    return contentFrame
-end
-
-----------------------------------------
--- Cast Handling Module
-----------------------------------------
-
--- Filter spells by player class, specialization, and learned interrupts
-local function FilterSpellsByClassAndSpec()
-    GPlaterDB.CastHandling.SpellsToMonitor = GPlaterDB.CastHandling.SpellsToMonitor or {}
-    local filteredSpells = {}
-    local currentSpec = GetPlayerSpec()
-
-    for _, entry in ipairs(GPlaterDB.CastHandling.SpellsToMonitor) do
-        if not entry.specialAttention then
-            table.insert(filteredSpells, entry)
-        else
-            for spellID, info in pairs(InterruptClassMap or {}) do
-                if info.class == PLAYER_CLASS and (info.spec == nil or info.spec == currentSpec or (type(info.spec) == "table" and tContains(info.spec, currentSpec))) and IsSpellKnown(spellID) then
-                    table.insert(filteredSpells, entry)
-                    break
-                end
-            end
-        end
-    end
-    GPlaterDB.CastHandling.FilteredSpellsToMonitor = filteredSpells
-end
-
--- Check if an interrupt is available
-local function IsInterruptAvailable()
-    local interrupts = {}
-    local currentSpec = GetPlayerSpec()
-    for spellID, info in pairs(InterruptClassMap or {}) do
-        if info.class == PLAYER_CLASS and (info.spec == nil or info.spec == currentSpec or (type(info.spec) == "table" and tContains(info.spec, currentSpec))) then
-            local spellInfo = C_Spell.GetSpellInfo(spellID) -- WoW 11.1 API
-            if spellInfo and spellInfo.name and IsSpellKnown(spellID) then
-                local cdInfo = C_Spell.GetSpellCooldown(spellID)
-                if cdInfo and cdInfo.startTime == 0 then
-                    table.insert(interrupts, spellID)
-                end
-            end
-        end
-    end
-    return #interrupts > 0, interrupts
-end
-
--- Check if a spell is being cast or channeled
-local function CheckSpellCast(unitFrame, spellID)
-    if not unitFrame or not unitFrame.unit then return false, false end
-    local unit = unitFrame.unit
-    local isCasting, isInterruptible = false, true
-    local name, _, _, _, _, _, castSpellID, _, notInterruptible = UnitCastingInfo(unit)
-    if name and castSpellID == spellID then
-        isCasting = true
-        isInterruptible = not notInterruptible
-    else
-        name, _, _, _, _, _, castSpellID, notInterruptible = UnitChannelInfo(unit)
-        if name and castSpellID == spellID then
-            isCasting = true
-            isInterruptible = not notInterruptible
-        end
-    end
-    return isCasting, isInterruptible
-end
-
--- Apply cast handling effects
-local function ApplyCastHandling(plateFrame)
-    if not plateFrame or not plateFrame.unitFrame or not plateFrame.unitFrame.unit or not GPlaterDB.CastHandling.EnableCastHandling or not GPlaterDB.CastHandling.FilteredSpellsToMonitor then
-        return false, false, false
-    end
-
-    local unitFrame = plateFrame.unitFrame
-    local unit = plateFrame.namePlateUnitToken
-    local hasInterrupt, interrupts = IsInterruptAvailable()
-    local isCastingMonitoredSpell, isSpecialAttention, isTopPriority, isInterruptible = false, false, false, true
-
-    for _, config in ipairs(GPlaterDB.CastHandling.FilteredSpellsToMonitor) do
-        local isCasting, interruptible = CheckSpellCast(unitFrame, config.spellID)
-        if isCasting then
-            isCastingMonitoredSpell = true
-            isInterruptible = interruptible
-            if config.specialAttention and hasInterrupt and interruptible then
-                isSpecialAttention = true
-            end
-            if config.topPriority then
-                isTopPriority = true
-            end
-            break
-        end
-    end
-
-    local wasTopPriority = GPlaterDB.CastHandling.topPriorityUnits[unitFrame]
-    if isTopPriority and not wasTopPriority then
-        if not GPlaterDB.CastHandling.unitKeys[unitFrame] then
-            GPlaterDB.CastHandling.unitKeys[unitFrame] = #GPlaterDB.CastHandling.unitKeys + 1
-        end
-        GPlaterDB.CastHandling.castCounter = GPlaterDB.CastHandling.castCounter + 1
-        unitFrame._castOrder = GPlaterDB.CastHandling.castCounter
-        GPlaterDB.CastHandling.topPriorityUnits[unitFrame] = unitFrame._castOrder
-        unitFrame._originalLevel = unitFrame:GetFrameLevel()
-        local newFrameLevel = unitFrame._originalLevel + 100 + (unitFrame._castOrder * 10) + GPlaterDB.CastHandling.unitKeys[unitFrame]
-        if not InCombatLockdown() then
-            plateFrame:SetFrameLevel(newFrameLevel)
-        else
-            GPlaterDB.CastHandling.pendingFrameLevels[unit] = newFrameLevel
-        end
-    elseif not isTopPriority and wasTopPriority then
-        GPlaterDB.CastHandling.topPriorityUnits[unitFrame] = nil
-        if unitFrame._originalLevel then
-            if not InCombatLockdown() then
-                plateFrame:SetFrameLevel(unitFrame._originalLevel)
             else
-                GPlaterDB.CastHandling.pendingFrameLevels[unit] = unitFrame._originalLevel
+                GPlaterNS.Utils:Log("ApplyEffects: Invalid UNIQUE config for key %s on GUID %s", 4, "auras", uniqueKey, guid)
             end
-            unitFrame._originalLevel = nil
-            unitFrame._castOrder = nil
+        else
+            GPlaterNS.Utils:Log("ApplyEffects: No UNIQUE config found for key %s on GUID %s", 4, "auras", tostring(uniqueKey), guid)
+        end
+    elseif frame.GPlaterEffects.unique then
+        -- 移除 UNIQUE 效果
+        GPlaterNS.Utils:Log("ApplyEffects: Resetting UNIQUE effect for GUID %s with auraID %s", 2, "auras", guid, tostring(frame.GPlaterEffects.uniqueAuraID))
+        self.effectHandlers.UNIQUE.reset(frame, unitType, guid, frame.GPlaterEffects.uniqueAuraID)
+        frame.GPlaterEffects.unique = nil
+        frame.GPlaterEffects.uniqueAuraID = nil
+    end
+
+    -- 应用其他效果
+    if effects.COLOR.healthBar then
+        self.ColorEffect:Apply(frame, effects.COLOR.healthBar, "healthBar")
+        frame.GPlaterEffects.healthBar = effects.COLOR.healthBar
+    elseif frame.GPlaterEffects.healthBar then
+        self.ColorEffect:Reset(frame, "healthBar", unitType, guid)
+        frame.GPlaterEffects.healthBar = nil
+    end
+
+    if effects.COLOR.nameText then
+        self.ColorEffect:Apply(frame, effects.COLOR.nameText, "nameText")
+        frame.GPlaterEffects.nameText = effects.COLOR.nameText
+    elseif frame.GPlaterEffects.nameText then
+        self.ColorEffect:Reset(frame, "nameText", unitType, guid)
+        frame.GPlaterEffects.nameText = nil
+    end
+    if effects.COLOR.border then
+        self.ColorEffect:Apply(frame, effects.COLOR.border, "border")
+        frame.GPlaterEffects.border = effects.COLOR.border
+    elseif frame.GPlaterEffects.border then
+        self.ColorEffect:Reset(frame, "border", unitType, guid)
+        frame.GPlaterEffects.border = nil
+    end
+
+    if effects.SCALE then
+        self.ScaleEffect:Apply(frame, guid, effects.SCALE)
+        frame.GPlaterEffects.scale = effects.SCALE
+    elseif frame.GPlaterEffects.scale then
+        self.ScaleEffect:Reset(frame, guid)
+        frame.GPlaterEffects.scale = nil
+    end
+
+    if effects.FLASH then
+        self.FlashEffect:Apply(frame)
+        frame.GPlaterEffects.flash = true
+    elseif frame.GPlaterEffects.flash then
+        self.FlashEffect:Reset(frame)
+        frame.GPlaterEffects.flash = nil
+    end
+
+    if effects.TOP then
+        self.LevelEffect:Apply(frame, GPlaterNS.Constants.EFFECT_TYPE_TOP, guid)
+        frame.GPlaterEffects.top = true
+        frame.GPlaterEffects.low = false
+    elseif effects.LOW then
+        self.LevelEffect:Apply(frame, GPlaterNS.Constants.EFFECT_TYPE_LOW, guid)
+        frame.GPlaterEffects.low = true
+        frame.GPlaterEffects.top = false
+    elseif frame.GPlaterEffects.top or frame.GPlaterEffects.low then
+        self.LevelEffect:Reset(frame, guid)
+        frame.GPlaterEffects.top = false
+        frame.GPlaterEffects.low = false
+    end
+
+    GPlaterNS.Utils:Log("ApplyEffects: applied effects to guid=%s", 3, "auras", tostring(guid))
+end
+
+local nameTextUpdateQueue = {} -- guid -> {frame, r, g, b}
+local centralizedNameTextUpdateFrame = CreateFrame("Frame", "GPlater_CentralNameTextUpdate")
+centralizedNameTextUpdateFrame:SetScript("OnUpdate", function(self, elapsed)
+    if not next(nameTextUpdateQueue) then
+        self:Hide() -- No need to run if queue is empty
+        return
+    end
+    for guid, data in pairs(nameTextUpdateQueue) do
+        local uF = data.frame
+        if uF and uF:IsVisible() and uF.healthBar and uF.healthBar.unitName and uF.healthBar.unitName:IsObjectType("FontString") then
+            local r, g, b = data.r, data.g, data.b
+            uF.healthBar.unitName:SetTextColor(r, g, b, 1)
+        else
+            -- Frame is no longer valid or visible, remove from queue
+            nameTextUpdateQueue[guid] = nil 
         end
     end
+end)
+centralizedNameTextUpdateFrame:Hide() -- Start hidden
 
-    return isCastingMonitoredSpell, isSpecialAttention, isTopPriority
-end
+EffectUtils.ColorEffect = EffectUtils.ColorEffect or {}
+setmetatable(EffectUtils.ColorEffect, { __index = EffectUtils })
 
--- Apply queued frame level changes
-local function ApplyPendingFrameLevels()
-    if InCombatLockdown() or not GPlaterDB.CastHandling.pendingFrameLevels then return end
-    for unit, level in pairs(GPlaterDB.CastHandling.pendingFrameLevels) do
-        for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-            if plateFrame.namePlateUnitToken == unit then
-                plateFrame:SetFrameLevel(level)
-                break
-            end
+function EffectUtils.ColorEffect:Apply(uF, color, effectType)
+    if not color or not effectType then 
+        GPlaterNS.Utils:Log("ColorEffect:Apply: missing color or effectType", 4, "auras")
+        return false 
+    end
+    GPlaterNS.Utils:Log("ColorEffect:Apply - uF: %s, Color: %s, Type: %s", 2, "auras", tostring(uF and uF:GetName()), tostring(color), tostring(effectType))
+    local r, g, b, a = GPlaterNS.Utils:HexToRGB(color); if not a then a = 1 end
+    if not r then GPlaterNS.Utils:Log("ColorEffect:Apply - HexToRGB failed for color %s", 4, "auras", color); return false end
+
+    if not Plater or not Plater.SetNameplateColor or not Plater.SetBorderColor then GPlaterNS.Utils:Log("ColorEffect:Apply - Plater APIs missing", 4, "auras"); return false end
+
+    if effectType == "healthBar" then
+        GPlaterNS.Utils:Log("ColorEffect:Apply - Calling Plater.SetNameplateColor for healthBar with r=%s, g=%s, b=%s", 2, "auras", r,g,b)
+        return self:SafeExecute(Plater.SetNameplateColor, uF, "healthBar", uF, r, g, b)
+    elseif effectType == "nameText" then
+        if not (uF.healthBar and uF.healthBar.unitName and uF.healthBar.unitName:IsObjectType("FontString")) then
+            GPlaterNS.Utils:Log("ColorEffect:Apply: invalid nameText object for uF %s", 4, "auras", uF:GetName() or "UNKNOWN")
+            return false
         end
-    end
-    GPlaterDB.CastHandling.pendingFrameLevels = {}
-end
-
--- Update cast handling with throttling
-local LastUpdateCast = {}
-local THROTTLE_INTERVAL_CAST = 0.2 -- Aligned with Aura Coloring
-local isUpdatingCast = {}
-
-local function UpdateCastHandlingNameplate(plateFrame, forceUpdate)
-    if not plateFrame or not plateFrame.unitFrame or not plateFrame.namePlateUnitToken then return end
-
-    local unitFrame = plateFrame.unitFrame
-    local unit = plateFrame.namePlateUnitToken
-    if isUpdatingCast[unit] then return end
-    isUpdatingCast[unit] = true
-
-    local now = GetTime()
-    LastUpdateCast[unit] = LastUpdateCast[unit] or 0
-    if not (forceUpdate or (now - LastUpdateCast[unit] >= THROTTLE_INTERVAL_CAST)) then
-        isUpdatingCast[unit] = false
-        return
-    end
-    LastUpdateCast[unit] = now
-
-    if not IsUnitAttackable(unit) then
-        unitFrame:SetAlpha(1)
-        isUpdatingCast[unit] = false
-        return
-    end
-
-    if GPlaterDB.CastHandling.config.showOnTargeting and unitFrame.namePlateIsTarget then
-        unitFrame:SetAlpha(1)
-        isUpdatingCast[unit] = false
-        return
-    end
-
-    if GPlaterDB.CastHandling.config.showOnMark and GetRaidTargetIndex(unit) then
-        unitFrame:SetAlpha(1)
-        isUpdatingCast[unit] = false
-        return
-    end
-
-    local isCasting, isSpecialAttention, isTopPriority = ApplyCastHandling(plateFrame)
-    local wasConcerned = unitFrame._isConcerned or false
-    if isSpecialAttention and not wasConcerned then
-        GPlaterDB.CastHandling._ConcernedNum = GPlaterDB.CastHandling._ConcernedNum + 1
-        unitFrame._isConcerned = true
-    elseif not isSpecialAttention and wasConcerned then
-        GPlaterDB.CastHandling._ConcernedNum = math.max(0, GPlaterDB.CastHandling._ConcernedNum - 1)
-        unitFrame._isConcerned = false
-    end
-
-    -- Stop any flash animations before setting alpha to ensure transparency
-    if unitFrame.flashAnimation then
-        unitFrame.flashAnimation:Stop()
-        unitFrame.flashAnimation = nil
-    end
-    unitFrame:SetAlpha(isSpecialAttention and 1 or (GPlaterDB.CastHandling._ConcernedNum > 0 and 0 or 1))
-
-    isUpdatingCast[unit] = false
-    C_Timer.After(60, function() isUpdatingCast[unit] = nil end)
-end
-
--- Event handling for casts
-local function OnUnitSpellCast(event, unit)
-    if unit == "player" or not unit then return end
-    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-        if plateFrame and plateFrame.namePlateUnitToken and (plateFrame.namePlateUnitToken == unit or UnitGUID(plateFrame.namePlateUnitToken) == UnitGUID(unit)) then
-            UpdateCastHandlingNameplate(plateFrame, true)
-        end
-    end
-end
-
--- Setup cast handling hooks
-local function SetupCastHandlingHooks()
-    if not Plater or not Plater.db or not Plater.db.profile then return false end
-
-    local eventFrame = CreateFrame("Frame")
-    eventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-    eventFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
-    eventFrame:RegisterEvent("UNIT_SPELLCAST_START")
-    eventFrame:RegisterEvent("UNIT_SPELLCAST_STOP")
-    eventFrame:RegisterEvent("UNIT_SPELLCAST_INTERRUPTED")
-    eventFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_START")
-    eventFrame:RegisterEvent("UNIT_SPELLCAST_CHANNEL_STOP")
-    eventFrame:RegisterEvent("SPELL_UPDATE_COOLDOWN")
-    eventFrame:SetScript("OnEvent", function(self, event, unit)
-        if event == "NAME_PLATE_UNIT_ADDED" or event == "SPELL_UPDATE_COOLDOWN" then
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateCastHandlingNameplate(plateFrame, true)
+        GPlaterNS.Utils:Log("ColorEffect:Apply - Setting nameText color for GUID %s with r=%s, g=%s, b=%s, a=%s", 2, "auras", tostring(uF.namePlateUnitToken and UnitGUID(uF.namePlateUnitToken)), r,g,b,a)
+        local success = self:SafeExecute(uF.healthBar.unitName.SetTextColor, uF, "nameText_direct", uF.healthBar.unitName, r, g, b, a)
+        -- Queueing logic for nameTextUpdateQueue can remain if needed, but direct application is logged above
+        if success then
+            local guid = UnitGUID(uF.namePlateUnitToken)
+            if guid then
+                nameTextUpdateQueue[guid] = {frame = uF, r = r, g = g, b = b, a = a} 
+                if not centralizedNameTextUpdateFrame:IsShown() and next(nameTextUpdateQueue) then
+                    centralizedNameTextUpdateFrame:Show()
                 end
             end
-        elseif event == "NAME_PLATE_UNIT_REMOVED" and unit then
-            if GPlaterDB.CastHandling._ConcernedNum > 0 then
-                for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                    if plateFrame.namePlateUnitToken == unit and plateFrame.unitFrame._isConcerned then
-                        GPlaterDB.CastHandling._ConcernedNum = math.max(0, GPlaterDB.CastHandling._ConcernedNum - 1)
-                        plateFrame.unitFrame._isConcerned = false
-                        for _, otherPlate in ipairs(Plater.GetAllShownPlates() or {}) do
-                            if otherPlate and otherPlate.namePlateUnitToken then
-                                UpdateCastHandlingNameplate(otherPlate, true)
-                            end
-                        end
-                        break
-                    end
-                end
-            end
-            for unitFrame, _ in pairs(GPlaterDB.CastHandling.topPriorityUnits) do
-                if unitFrame.PlateFrame and unitFrame.PlateFrame.namePlateUnitToken == unit then
-                    GPlaterDB.CastHandling.topPriorityUnits[unitFrame] = nil
-                    if unitFrame._originalLevel then
-                        if not InCombatLockdown() then
-                            unitFrame.PlateFrame:SetFrameLevel(unitFrame._originalLevel)
-                        else
-                            GPlaterDB.CastHandling.pendingFrameLevels[unit] = unitFrame._originalLevel
-                        end
-                        unitFrame._originalLevel = nil
-                        unitFrame._castOrder = nil
-                    end
-                    break
-                end
-            end
-        elseif event:match("^UNIT_SPELLCAST_") or event:match("^UNIT_SPELLCAST_CHANNEL_") then
-            OnUnitSpellCast(event, unit)
         end
-    end)
+        return success
+    elseif effectType == "border" then
+        GPlaterNS.Utils:Log("ColorEffect:Apply - Calling Plater.SetBorderColor for border with r=%s, g=%s, b=%s", 2, "auras", r,g,b)
+        return self:SafeExecute(Plater.SetBorderColor, uF, "border", uF, r, g, b)
+    end
+    GPlaterNS.Utils:Log("ColorEffect:Apply: unknown effectType %s", 4, "auras", effectType)
+    return false
+end
 
-    if Plater.UpdatePlateFrame then
-        hooksecurefunc(Plater, "UpdatePlateFrame", function(plateFrame)
-            if plateFrame and plateFrame.namePlateUnitToken and not isUpdatingCast[plateFrame.namePlateUnitToken] then
-                UpdateCastHandlingNameplate(plateFrame, true)
+function EffectUtils.ColorEffect:Reset(uF, effectType, unitTypeIfForPlaterDefaults, unitID_guid) -- unitID_guid 现在是 GUID
+    if not self:ValidateUnitFrame(uF, effectType .. "_reset") then -- 确保 ValidateUnitFrame 适用
+        GPlaterNS.Utils:Log("ColorEffect:Reset: invalid unit frame for %s, effectType=%s", 4, "auras", tostring(unitID_guid), effectType)
+        -- 即使 uF 无效，如果 unitID_guid 存在，也尝试从队列中移除
+        if effectType == "nameText" and unitID_guid then
+            nameTextUpdateQueue[unitID_guid] = nil
+            if not next(nameTextUpdateQueue) and centralizedNameTextUpdateFrame:IsShown() then
+                centralizedNameTextUpdateFrame:Hide()
+                GPlaterNS.Utils:Log("ColorEffect:Reset nameText (uF invalid) - Queue empty, hiding centralized frame for GUID: %s", 3, "ui", unitID_guid)
             end
-        end)
+        end
+        return false 
     end
 
+    if effectType == "healthBar" then
+        if Plater and Plater.RefreshNameplateColor then
+            local success = self:SafeExecute(Plater.RefreshNameplateColor, uF, "healthBar_reset", uF)
+            return success
+        end
+        GPlaterNS.Utils:Log("ColorEffect:Reset: Plater.RefreshNameplateColor missing", 4, "auras")
+        return false
+    elseif effectType == "border" then
+        if Plater and Plater.SetBorderColor then
+            local resetColorHex = GPlaterNS.Config:Get({"AuraColoring", "settings", "resetBorderColor"}, GPlaterNS.Constants.DEFAULT_RESET_BORDER_COLOR)
+            local r, g, b = GPlaterNS.Utils:HexToRGB("#" .. resetColorHex) -- 假设 HexToRGB 不需要 '#'
+            if r then -- 确保 HexToRGB 成功返回
+                local success = self:SafeExecute(Plater.SetBorderColor, uF, "border_reset", uF, r, g, b)
+                return success
+            end
+            GPlaterNS.Utils:Log("ColorEffect:Reset: invalid reset color %s", 4, "auras", resetColorHex)
+        end
+        GPlaterNS.Utils:Log("ColorEffect:Reset: Plater.SetBorderColor missing", 4, "auras")
+        return false
+    elseif effectType == "nameText" then
+        if unitID_guid then 
+            nameTextUpdateQueue[unitID_guid] = nil
+            -- 如果队列为空，隐藏 centralizedNameTextUpdateFrame 以停止其 OnUpdate
+            if not next(nameTextUpdateQueue) and centralizedNameTextUpdateFrame:IsShown() then
+                centralizedNameTextUpdateFrame:Hide()
+                GPlaterNS.Utils:Log("ColorEffect:Reset nameText - Queue empty, hiding centralized frame for GUID: %s", 3, "ui", unitID_guid)
+            end
+        end
+        -- 总是尝试重置文本颜色到默认值，即使它不在队列中（可能被其他插件修改）
+        if uF.healthBar and uF.healthBar.unitName and uF.healthBar.unitName:IsObjectType("FontString") then
+            self:SafeExecute(uF.healthBar.unitName.SetTextColor, uF, "nameText_reset_direct", uF.healthBar.unitName, 1, 1, 1, 1) -- 默认白色，完全不透明
+        end
+        return true
+    end
+    GPlaterNS.Utils:Log("ColorEffect:Reset: unknown effectType %s", 4, "auras", effectType)
+    return false
+end
+
+EffectUtils.ScaleEffect = EffectUtils.ScaleEffect or {}
+setmetatable(EffectUtils.ScaleEffect, { __index = EffectUtils })
+
+function EffectUtils.ScaleEffect:Apply(uF, id, scale)
+    if not self:ValidateUnitFrame(uF, "scale") or not id or not scale then 
+        GPlaterNS.Utils:Log("ScaleEffect:Apply: invalid inputs", 4, "auras")
+        return false 
+    end
+    local settings = GPlaterNS.State.PlaterSettings[id] or { baseScale = 1.0 }
+    local success = self:SafeExecute(uF.SetScale, uF, "scale", uF, settings.baseScale * scale)
+    return success
+end
+
+function EffectUtils.ScaleEffect:Reset(uF, id)
+    if not self:ValidateUnitFrame(uF, "scale") or not id then 
+        GPlaterNS.Utils:Log("ScaleEffect:Reset: invalid inputs", 4, "auras")
+        return false 
+    end
+    local settings = GPlaterNS.State.PlaterSettings[id] or { baseScale = 1.0 }
+    local success = self:SafeExecute(uF.SetScale, uF, "scale", uF, settings.baseScale)
+    return success
+end
+
+EffectUtils.FlashEffect = EffectUtils.FlashEffect or {}
+setmetatable(EffectUtils.FlashEffect, { __index = EffectUtils })
+
+function EffectUtils.FlashEffect:Apply(uF)
+    if not self:ValidateUnitFrame(uF, "flash") then 
+        GPlaterNS.Utils:Log("FlashEffect:Apply: invalid unit frame", 4, "auras")
+        return false
+    end
+    if Plater and Plater.FlashNameplateBody then
+        local success = self:SafeExecute(Plater.FlashNameplateBody, uF, "flash_body_plater_api", uF, nil, 0.5)
+        return success
+    end
+        GPlaterNS.Utils:Log("FlashEffect:Apply: Plater.FlashNameplateBody missing", 4, "auras")
+    return false
+end
+
+function EffectUtils.FlashEffect:Reset(uF)
+    if uF.flashEffect and uF.flashEffect.Stop then
+        self:SafeExecute(uF.flashEffect.Stop, uF, "flash_stop_custom_anim", uF.flashEffect)
+        uF.flashEffect = nil
+    end
     return true
 end
 
--- Initialize cast handling
-local function UpdateCastHandling()
-    FilterSpellsByClassAndSpec()
-    C_Timer.After(5, function()
-        if not SetupCastHandlingHooks() then
-            C_Timer.After(5, SetupCastHandlingHooks)
-        end
-    end)
+EffectUtils.LevelEffect = EffectUtils.LevelEffect or {}
+setmetatable(EffectUtils.LevelEffect, { __index = EffectUtils })
+
+function EffectUtils.LevelEffect:Apply(uF, effect, id)
+    if not self:ValidateUnitFrame(uF, "level") or not effect or not id then 
+        GPlaterNS.Utils:Log("LevelEffect:Apply: invalid inputs", 4, "auras")
+        return false 
+    end
+    local strata = effect == GPlaterNS.Constants.EFFECT_TYPE_TOP and "DIALOG" or "BACKGROUND"
+    local success = self:SafeExecute(uF.SetFrameStrata, uF, "level_strata", uF, strata)
+    return success
 end
 
--- Create Cast Handling content
-local function CreateCastHandlingContent(parent)
-    if not parent then
-        local errorMsg = "Parent frame is nil"
-        local errorFrame = CreateFrame("Frame", nil, UIParent)
-        local errorText = errorFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        errorText:SetPoint("CENTER")
-        errorText:SetText(string.format(GPlaterL["MODULE_LOAD_ERROR"], "Cast Handling", errorMsg))
-        return errorFrame
+function EffectUtils.LevelEffect:Reset(uF, id)
+    if not self:ValidateUnitFrame(uF, "level") or not id then 
+        GPlaterNS.Utils:Log("LevelEffect:Reset: invalid inputs", 4, "auras")
+        return false 
     end
-
-    local contentFrame = CreateFrame("Frame", nil, parent)
-    contentFrame:SetSize(740, 550)
-
-    local success, errorMsg = pcall(function()
-        -- Enable Cast Handling
-        local enableCastHandlingCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-        enableCastHandlingCheck:SetPoint("TOPLEFT", 20, -40)
-        enableCastHandlingCheck:SetSize(26, 26)
-        enableCastHandlingCheck.text:SetText(GPlaterL["ENABLE_CAST_HANDLING"])
-        enableCastHandlingCheck:SetChecked(GPlaterDB.CastHandling.EnableCastHandling)
-        enableCastHandlingCheck:SetScript("OnClick", function(self)
-            GPlaterDB.CastHandling.EnableCastHandling = self:GetChecked()
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateCastHandlingNameplate(plateFrame, true)
-                end
-            end
-        end)
-
-        -- Show Target Unit
-        local showTargetCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-        showTargetCheck:SetPoint("TOPLEFT", 20, -70)
-        showTargetCheck:SetSize(26, 26)
-        showTargetCheck.text:SetText(GPlaterL["ALWAYS_SHOW_TARGET_UNIT"])
-        showTargetCheck:SetChecked(GPlaterDB.CastHandling.config.showOnTargeting)
-        showTargetCheck:SetScript("OnClick", function(self)
-            GPlaterDB.CastHandling.config.showOnTargeting = self:GetChecked()
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateCastHandlingNameplate(plateFrame, true)
-                end
-            end
-        end)
-
-        -- Show Marked Units
-        local showMarkCheck = CreateFrame("CheckButton", nil, contentFrame, "UICheckButtonTemplate")
-        showMarkCheck:SetPoint("TOPLEFT", 20, -100)
-        showMarkCheck:SetSize(26, 26)
-        showMarkCheck.text:SetText(GPlaterL["ALWAYS_SHOW_MARKED_UNITS"])
-        showMarkCheck:SetChecked(GPlaterDB.CastHandling.config.showOnMark)
-        showMarkCheck:SetScript("OnClick", function(self)
-            GPlaterDB.CastHandling.config.showOnMark = self:GetChecked()
-            for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                if plateFrame and plateFrame.namePlateUnitToken then
-                    UpdateCastHandlingNameplate(plateFrame, true)
-                end
-            end
-        end)
-
-        -- Spell Table
-        local spellTableFrame = CreateFrame("ScrollFrame", nil, contentFrame, "UIPanelScrollFrameTemplate")
-        spellTableFrame:SetPoint("TOPLEFT", 10, -170)
-        spellTableFrame:SetPoint("BOTTOMRIGHT", -10, 60)
-        spellTableFrame:SetClipsChildren(true)
-        local spellTableContent = CreateFrame("Frame", nil, spellTableFrame)
-        spellTableContent:SetSize(710, math.max(400, (#(GPlaterDB.CastHandling.SpellsToMonitor or {}) + 1) * 24 + 30))
-        spellTableFrame:SetScrollChild(spellTableContent)
-        contentFrame.spellTableContent = spellTableContent
-
-        local headers = {
-            GPlaterL["SPELL_ID"],
-            GPlaterL["SPELL_NAME"],
-            GPlaterL["SPECIAL_ATTENTION"],
-            GPlaterL["TOP_PRIORITY"],
-            ""
-        }
-        local columnWidths = {
-            100, -- SPELL_ID
-            200, -- SPELL_NAME
-            100, -- SPECIAL_ATTENTION
-            100, -- TOP_PRIORITY
-            60   -- DELETE
-        }
-        local totalWidth = 0
-        for _, width in ipairs(columnWidths) do
-            totalWidth = totalWidth + width
-        end
-        local leftOffset = (710 - totalWidth) / 2
-
-        local function CreateTableHeaders()
-            local offset = leftOffset
-            for i, header in ipairs(headers) do
-                local label = spellTableContent:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-                label:SetPoint("TOPLEFT", offset, -10)
-                label:SetSize(columnWidths[i], 20)
-                label:SetText(header)
-                offset = offset + columnWidths[i]
-            end
-        end
-
-        local function UpdateSpellTable()
-            if spellTableContent.rows then
-                for _, row in ipairs(spellTableContent.rows) do
-                    for _, widget in ipairs(row) do
-                        widget:Hide()
-                        widget:ClearAllPoints()
-                    end
-                end
-            end
-            spellTableContent.rows = {}
-
-            GPlaterDB.CastHandling.SpellsToMonitor = GPlaterDB.CastHandling.SpellsToMonitor or {}
-            local classSpells, otherSpells = {}, {}
-            for i, entry in ipairs(GPlaterDB.CastHandling.SpellsToMonitor) do
-                local isClassSpell = InterruptClassMap and InterruptClassMap[entry.spellID] and InterruptClassMap[entry.spellID].class == PLAYER_CLASS
-                table.insert(isClassSpell and classSpells or otherSpells, { index = i, entry = entry })
-            end
-
-            local sortedSpells = {}
-            for _, spell in ipairs(classSpells) do table.insert(sortedSpells, spell) end
-            for _, spell in ipairs(otherSpells) do table.insert(sortedSpells, spell) end
-
-            for rowIndex, spell in ipairs(sortedSpells) do
-                local i = spell.index
-                local entry = spell.entry
-                local row = {}
-                local offset = leftOffset
-                local isClassSpell = InterruptClassMap and InterruptClassMap[entry.spellID] and InterruptClassMap[entry.spellID].class == PLAYER_CLASS
-
-                -- Spell ID
-                local idEdit = CreateFrame("EditBox", nil, spellTableContent, "InputBoxTemplate")
-                idEdit:SetPoint("TOPLEFT", offset + 5, -30 - (rowIndex * 24))
-                idEdit:SetSize(columnWidths[1] - 10, 20)
-                idEdit:SetAutoFocus(false)
-                idEdit:SetText(tostring(entry.spellID))
-                idEdit:SetTextColor(isClassSpell and 1 or 0.5, isClassSpell and 1 or 0.5, isClassSpell and 1 or 0.5)
-                idEdit:SetJustifyH("LEFT")
-                idEdit:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
-                idEdit:SetScript("OnEditFocusLost", function(self)
-                    local text = self:GetText():trim()
-                    local spellID = tonumber(text)
-                    if spellID and C_Spell.GetSpellName(spellID) then
-                        entry.spellID = spellID
-                        local spellName = C_Spell.GetSpellName(spellID) or "Unknown"
-                        row[2]:SetText(spellName)
-                    else
-                        print(string.format("|cFFFF0000GPlater: %s|r", string.format(GPlaterL["INVALID_SPELL_ID"], text)))
-                        self:SetText(tostring(entry.spellID))
-                    end
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateCastHandlingNameplate(plateFrame, true)
-                        end
-                    end
-                end)
-                idEdit:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-                row[1] = idEdit
-                offset = offset + columnWidths[1]
-
-                -- Spell Name
-                local nameText = spellTableContent:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-                nameText:SetPoint("TOPLEFT", offset + 5, -30 - (rowIndex * 24))
-                nameText:SetSize(columnWidths[2] - 10, 20)
-                nameText:SetJustifyH("LEFT")
-                local spellName = C_Spell.GetSpellName(entry.spellID) or "Unknown"
-                nameText:SetText(spellName)
-                nameText:SetTextColor(isClassSpell and 1 or 0.5, isClassSpell and 1 or 0.5, isClassSpell and 1 or 0.5)
-                row[2] = nameText
-                offset = offset + columnWidths[2]
-
-                -- Special Attention
-                local specialAttentionCheck = CreateFrame("CheckButton", nil, spellTableContent, "UICheckButtonTemplate")
-                specialAttentionCheck:SetPoint("TOPLEFT", offset + (columnWidths[3] - 26) / 2, -30 - (rowIndex * 24))
-                specialAttentionCheck:SetSize(26, 26)
-                specialAttentionCheck:SetChecked(entry.specialAttention)
-                specialAttentionCheck:SetScript("OnClick", function(self)
-                    entry.specialAttention = self:GetChecked()
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateCastHandlingNameplate(plateFrame, true)
-                        end
-                    end
-                end)
-                row[3] = specialAttentionCheck
-                offset = offset + columnWidths[3]
-
-                -- Top Priority
-                local topPriorityCheck = CreateFrame("CheckButton", nil, spellTableContent, "UICheckButtonTemplate")
-                topPriorityCheck:SetPoint("TOPLEFT", offset + (columnWidths[4] - 26) / 2, -30 - (rowIndex * 24))
-                topPriorityCheck:SetSize(26, 26)
-                topPriorityCheck:SetChecked(entry.topPriority)
-                topPriorityCheck:SetScript("OnClick", function(self)
-                    entry.topPriority = self:GetChecked()
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateCastHandlingNameplate(plateFrame, true)
-                        end
-                    end
-                end)
-                row[4] = topPriorityCheck
-                offset = offset + columnWidths[4]
-
-                -- Delete
-                local deleteButton = CreateFrame("Button", nil, spellTableContent, "UIPanelButtonTemplate")
-                deleteButton:SetPoint("TOPLEFT", offset + (columnWidths[5] - 50) / 2, -30 - (rowIndex * 24))
-                deleteButton:SetSize(columnWidths[5] - 10, 20)
-                deleteButton:SetText(GPlaterL["DELETE"])
-                deleteButton:SetScript("OnClick", function()
-                    table.remove(GPlaterDB.CastHandling.SpellsToMonitor, i)
-                    UpdateSpellTable()
-                    for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-                        if plateFrame and plateFrame.namePlateUnitToken then
-                            UpdateCastHandlingNameplate(plateFrame, true)
-                        end
-                    end
-                end)
-                row[5] = deleteButton
-
-                -- Create a backdrop frame for the row
-                local rowFrame = CreateFrame("Frame", nil, spellTableContent, "BackdropTemplate")
-                rowFrame:SetPoint("TOPLEFT", leftOffset, -30 - (rowIndex * 24))
-                rowFrame:SetSize(totalWidth, 24)
-                rowFrame:SetBackdrop({
-                    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-                    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-                    tile = true, tileSize = 16, edgeSize = 8,
-                    insets = { left = 2, right = 2, top = 2, bottom = 2 }
-                })
-                rowFrame:SetBackdropColor(0, 0, 0, 0.5)
-                rowFrame:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
-
-                spellTableContent.rows[rowIndex] = row
-            end
-
-            -- Add button in the last row of Spell ID column
-            local addButton = spellTableContent.addButton or CreateFrame("Button", nil, spellTableContent, "UIPanelButtonTemplate")
-            spellTableContent.addButton = addButton
-            addButton:SetPoint("TOPLEFT", leftOffset + 5, -30 - ((#sortedSpells + 1) * 24))
-            addButton:SetSize(90, 22)
-            addButton:SetText(GPlaterL["ADD_SPELL"])
-            addButton:Show()
-            addButton:SetScript("OnClick", function()
-                table.insert(GPlaterDB.CastHandling.SpellsToMonitor, { spellID = 0, specialAttention = false, topPriority = false })
-                UpdateSpellTable()
-            end)
-
-            spellTableContent:SetHeight((#GPlaterDB.CastHandling.SpellsToMonitor + 2) * 24 + 30)
-        end
-
-        contentFrame.CreateTableHeaders = CreateTableHeaders
-        contentFrame.UpdateSpellTable = UpdateSpellTable
-        contentFrame:CreateTableHeaders()
-        contentFrame:UpdateSpellTable()
-    end)
-
-    if not success then
-        contentFrame:Hide()
-        local errorFrame = CreateFrame("Frame", nil, parent)
-        local errorText = errorFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        errorText:SetPoint("CENTER")
-        errorText:SetText(string.format(GPlaterL["MODULE_LOAD_ERROR"], "Cast Handling", errorMsg))
-        return errorFrame
-    end
-
-    return contentFrame
+    local settings = GPlaterNS.State.PlaterSettings[id] or { baseStrata = "MEDIUM" }
+    local success = self:SafeExecute(uF.SetFrameStrata, uF, "level_strata_reset", uF, settings.baseStrata)
+    return success
 end
 
-----------------------------------------
--- Settings Panel
-----------------------------------------
+EffectUtils.HideEffect = EffectUtils.HideEffect or {}
+setmetatable(EffectUtils.HideEffect, { __index = EffectUtils })
 
--- Module content creation function
-local function createModuleContent(parent, contentFunc, moduleName)
-    if not parent or not contentFunc then
-        local errorMsg = not parent and "Parent frame is nil" or "Content function is not defined"
-        local errorFrame = CreateFrame("Frame", nil, UIParent)
-        local errorText = errorFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        errorText:SetPoint("CENTER")
-        errorText:SetText(string.format(GPlaterL["MODULE_LOAD_ERROR"], moduleName, errorMsg))
-        return errorFrame
+function EffectUtils.HideEffect:Apply(uF, id, auraID, applicationTime, expirationTime)
+    if not uF or not uF:IsObjectType("Frame") then 
+        GPlaterNS.Utils:Log("HideEffect:Apply: invalid frame", 4, "auras")
+        return false 
     end
-
-    local success, result = pcall(contentFunc, parent)
-    if success and result and result:IsObjectType("Frame") then
-        return result
-    else
-        local errorMsg = success and "Invalid frame returned" or tostring(result)
-        local errorFrame = CreateFrame("Frame", nil, parent)
-        local errorText = errorFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        errorText:SetPoint("CENTER")
-        errorText:SetText(string.format(GPlaterL["MODULE_LOAD_ERROR"], moduleName, errorMsg))
-        return errorFrame
-    end
-end
-
-function CreateConfigPanel()
-    if not _G["Plater"] then return nil end
-
-    local frame = CreateFrame("Frame", "GPlaterConfigFrame", UIParent, "BackdropTemplate")
-    if not frame then return nil end
-    frame:SetSize(800, 600)
-    frame:SetPoint("CENTER")
-    frame:SetBackdrop({
-        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 16, edgeSize = 16,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 }
-    })
-    frame:SetBackdropColor(0, 0, 0, 0.8)
-    frame:SetMovable(true)
-    frame:EnableMouse(true)
-    frame:RegisterForDrag("LeftButton")
-    frame:SetScript("OnDragStart", frame.StartMoving)
-    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
-    tinsert(UISpecialFrames, "GPlaterConfigFrame")
-
-    -- Title
-    local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    title:SetPoint("TOP", 0, -10)
-    title:SetText(GPlaterL["SETTINGS_PANEL_TITLE"]:format(GPlaterL["ADDON_VERSION"]))
-
-    -- Close button
-    local closeButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
-    closeButton:SetPoint("TOPRIGHT", -5, -5)
-    closeButton:SetScript("OnClick", function() frame:Hide() end)
-
-    -- Tabs
-    local tabs = { "Aura Coloring", "Cast Handling", "Friendly Nameplates" }
-    local tabButtons = {}
-    local tabFrames = {}
-
-    -- Define SelectTab function
-    local function SelectTab(tabName)
-        if not tabName or not tabFrames[tabName] then tabName = "Aura Coloring" end
-        GPlaterDB.lastSelectedTab = tabName
-        for name, tFrame in pairs(tabFrames) do
-            tFrame:SetShown(name == tabName)
-        end
-        for name, button in pairs(tabButtons) do
-            if name == tabName then
-                button:LockHighlight()
-            else
-                button:UnlockHighlight()
-            end
-        end
-    end
-
-    -- Create tab buttons
-    for i, tabName in ipairs(tabs) do
-        local button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-        local tabText = locale == "zhCN" and L["zhCN"][tabName:upper():gsub(" ", "_") .. "_TAB"] or GPlaterL[tabName:upper():gsub(" ", "_") .. "_TAB"] or tabName
-        button:SetText(tabText)
-        if button.Text then button.Text:SetFont("Fonts\\FRIZQT__.TTF", 16, "OUTLINE") end
-        button:SetPoint("TOPLEFT", 10 + (i-1)*150, -30)
-        button:SetSize(150, 22)
-        button:SetScript("OnClick", function() SelectTab(tabName) end)
-        tabButtons[tabName] = button
-    end
-
-    -- Create content frames
-    for _, tabName in ipairs(tabs) do
-        local contentFrame = CreateFrame("Frame", nil, frame)
-        contentFrame:SetPoint("TOPLEFT", 10, -60)
-        contentFrame:SetPoint("BOTTOMRIGHT", -10, 10)
-        contentFrame:Hide()
-        tabFrames[tabName] = contentFrame
-    end
-
-    -- Load module contents
-    local contentFuncs = {
-        ["Aura Coloring"] = CreateAuraColoringContent,
-        ["Cast Handling"] = CreateCastHandlingContent,
-        ["Friendly Nameplates"] = CreateFriendlyNameplatesContent
+    GPlaterNS.State.HiddenNameplates[id] = GPlaterNS.State.HiddenNameplates[id] or {}
+    GPlaterNS.State.HiddenNameplates[id][auraID] = {
+        effectType = GPlaterNS.Constants.EFFECT_TYPE_HIDE,
+        auraID = auraID,
+        applicationTime = applicationTime or GetTime(),
+        expirationTime = expirationTime or math.huge
     }
-    for tabName, contentFunc in pairs(contentFuncs) do
-        local content = createModuleContent(tabFrames[tabName], contentFunc, tabName)
-        content:SetPoint("TOPLEFT", 0, 0)
-        content:SetPoint("BOTTOMRIGHT", 0, 0)
+    if not uF:IsForbidden() then
+        uF:Hide()
     end
-
-    -- Select last opened tab or default
-    SelectTab(GPlaterDB.lastSelectedTab)
-    return frame
+    return true
 end
 
--- Register slash command
-SlashCmdList["GPLATER"] = function()
-    if not _G["Plater"] then return end
-    if not GPlaterConfigFrame then
-        GPlaterConfigFrame = CreateConfigPanel()
-        if not GPlaterConfigFrame then return end
-    end
-    GPlaterConfigFrame:SetShown(not GPlaterConfigFrame:IsShown())
-end
-SLASH_GPLATER1 = "/gp"
-
-----------------------------------------
--- Initialization and Event Handling
-----------------------------------------
-
-local eventFrame = CreateFrame("Frame")
-eventFrame:RegisterEvent("PLAYER_LOGIN")
-eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-eventFrame:RegisterEvent("CVAR_UPDATE")
-eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-eventFrame:RegisterEvent("LOADING_SCREEN_DISABLED")
-eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-eventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
-eventFrame:SetScript("OnEvent", function(self, event, ...)
-    if event == "PLAYER_LOGIN" then
-        InitializeDatabase()
-        if not GPlaterConfigFrame then
-            GPlaterConfigFrame = CreateConfigPanel()
-            if GPlaterConfigFrame then GPlaterConfigFrame:Hide() end
-        end
-        self:UnregisterEvent("PLAYER_LOGIN")
-    elseif event == "PLAYER_ENTERING_WORLD" or event == "LOADING_SCREEN_DISABLED" then
-        UpdateFriendlyNameplates()
-        UpdateAuraColoring()
-        UpdateCastHandling()
-    elseif event == "PLAYER_REGEN_ENABLED" then
-        if GPlaterDB.Friendly and GPlaterDB.Friendly.updateCV then
-            UpdateFriendlyNameplates()
-            GPlaterDB.Friendly.updateCV = nil
-        end
-        ApplyPendingFrameLevels()
-        for _, plateFrame in ipairs(Plater.GetAllShownPlates() or {}) do
-            if plateFrame and plateFrame.namePlateUnitToken then
-                UpdateCastHandlingNameplate(plateFrame, true)
+function EffectUtils.HideEffect:Reset(uF, id, auraID)
+    if not uF or not uF:IsObjectType("Frame") then
+        if id and GPlaterNS.State.HiddenNameplates[id] and GPlaterNS.State.HiddenNameplates[id][auraID] then
+            GPlaterNS.State.HiddenNameplates[id][auraID] = nil
+            if not next(GPlaterNS.State.HiddenNameplates[id]) then 
+                GPlaterNS.State.HiddenNameplates[id] = nil
             end
         end
-    elseif event == "CVAR_UPDATE" then
-        UpdateFriendlyNameplatesSize()
-    elseif event == "PLAYER_SPECIALIZATION_CHANGED" or event == "PLAYER_TALENT_UPDATE" then
-        UpdateAuraColoring()
-        UpdateCastHandling()
+        GPlaterNS.Utils:Log("HideEffect:Reset: invalid frame", 4, "auras")
+        return false
+    end
+    if GPlaterNS.State.HiddenNameplates[id] and GPlaterNS.State.HiddenNameplates[id][auraID] then
+        local effectType = GPlaterNS.State.HiddenNameplates[id][auraID].effectType
+        if effectType == GPlaterNS.Constants.EFFECT_TYPE_HIDE or effectType == GPlaterNS.Constants.EFFECT_TYPE_HIDE_BY_UNIQUE then
+            local hasOtherHideEffects = false
+            for otherAuraID, effectData in pairs(GPlaterNS.State.HiddenNameplates[id] or {}) do
+                if otherAuraID ~= auraID and (effectData.effectType == GPlaterNS.Constants.EFFECT_TYPE_HIDE or effectData.effectType == GPlaterNS.Constants.EFFECT_TYPE_HIDE_BY_UNIQUE) then
+                    hasOtherHideEffects = true
+                    break
+                end
+            end
+            if not hasOtherHideEffects and not uF:IsForbidden() then
+                uF:Show()
+            end
+            GPlaterNS.State.HiddenNameplates[id][auraID] = nil
+            if not next(GPlaterNS.State.HiddenNameplates[id]) then 
+                GPlaterNS.State.HiddenNameplates[id] = nil
+            end
+        end
+    end
+    return true
+end
+
+function EffectUtils.HideEffect:ResetToBase(uF, id)
+    if not id then
+        GPlaterNS.Utils:Log("HideEffect:ResetToBase: nil id", 4, "auras")
+        return false
+    end
+
+    -- 清除 GPlater 直接施加的 HIDE 状态
+    if GPlaterNS.State.HiddenNameplates[id] then
+        for auraID, effectData in pairs(GPlaterNS.State.HiddenNameplates[id]) do
+            if effectData.effectType == GPlaterNS.Constants.EFFECT_TYPE_HIDE then
+                GPlaterNS.State.HiddenNameplates[id][auraID] = nil
+            end
+        end
+        if not next(GPlaterNS.State.HiddenNameplates[id]) then
+            GPlaterNS.State.HiddenNameplates[id] = nil
+        end
+    end
+
+    -- 仅当 HiddenNameplates[id] 为空且框架有效时显示姓名板
+    local success = false
+    if not GPlaterNS.State.HiddenNameplates[id] and uF and uF:IsObjectType("Frame") and not uF:IsForbidden() then
+        uF:Show()
+        success = true
+    end
+
+    GPlaterNS.Utils:Log("HideEffect:ResetToBase: Reset visibility for guid=%s, shown=%s", 3, "auras", tostring(id), tostring(success))
+    return success
+end
+
+function NameplateManager:ValidateNameplate(np)
+    if not np or not np.unit or not np.frame or not np.frame.unitFrame then
+        return false
+    end
+    if not UnitExists(np.unit) or not np.frame:IsShown() then
+        return false
+    end
+    return true
+end
+
+-- 在 GPlater.lua 文件中
+function NameplateManager:GetNameplate(guid)
+    if not guid then
+        return nil
+    end
+    GPlaterNS.Utils:Log("GetNameplate: Attempting to get nameplate for GUID: %s", 3, "nameplates", guid)
+
+    local np = GPlaterNS.State.Nameplates[guid]
+    if np then
+        GPlaterNS.Utils:Log("GetNameplate: Found cached entry for GUID %s. Validating...", 3, "nameplates", guid)
+        if self:ValidateNameplate(np) then
+            return np
+        else
+        end
+    else
+    end
+
+    -- 如果缓存无效或不存在，则尝试清理并重新注册
+    self:CleanupNameplateInfo(guid) -- 清理可能存在的旧的、无效的状态
+    local unitToken = UnitTokenFromGUID(guid)
+    GPlaterNS.Utils:Log("GetNameplate: UnitTokenFromGUID for %s is [%s]", 3, "nameplates", guid, tostring(unitToken))
+
+    if unitToken and UnitExists(unitToken) then
+        GPlaterNS.Utils:Log("GetNameplate: UnitToken [%s] exists for GUID %s. Calling RegisterUnit.", 3, "nameplates", unitToken, guid)
+        self:RegisterUnit(guid, unitToken) -- RegisterUnit 内部有自己的日志
+        np = GPlaterNS.State.Nameplates[guid] -- 重新获取（可能已被RegisterUnit填充）
+        if np and self:ValidateNameplate(np) then
+            GPlaterNS.Utils:Log("GetNameplate: Successfully registered and validated nameplate for GUID %s.", 2, "nameplates", guid)
+            return np
+        else
+            GPlaterNS.Utils:Log("GetNameplate: FAILED to validate nameplate for GUID %s after registration attempt.", 4, "nameplates", guid)
+        end
+    else
+        GPlaterNS.Utils:Log("GetNameplate: No valid unitToken or unit does not exist for GUID %s (UnitToken: [%s], UnitExists: %s).", 4, "nameplates", guid, tostring(unitToken), tostring(unitToken and UnitExists(unitToken)))
+    end
+    GPlaterNS.Utils:Log("GetNameplate: Returning NIL for GUID %s.", 4, "nameplates", guid)
+    return nil
+end
+
+function NameplateManager:RegisterUnit(guid, unit)
+    if not guid or not unit or not UnitExists(unit) or UnitGUID(unit) ~= guid then 
+        GPlaterNS.Utils:Log("RegisterUnit: invalid inputs", 4, "nameplates")
+        return 
+    end
+    local np = GPlaterNS.State.Nameplates[guid] or {}
+    np.unit = unit
+    np.frame = C_NamePlate.GetNamePlateForUnit(unit)
+    if not np.frame or not np.frame.unitFrame then 
+        GPlaterNS.Utils:Log("RegisterUnit: no valid frame for guid=%s", 4, "nameplates", tostring(guid))
+        return 
+    end
+    np.name = UnitName(unit) or "?"
+    np.type = UnitIsPlayer(unit) and "enemyplayer" or "attackablenpc"
+    np.timestamp = GetTime()
+    GPlaterNS.State.Nameplates[guid] = np
+    GPlaterNS.State.PlaterSettings[guid] = GPlaterNS.State.PlaterSettings[guid] or {
+        baseScale = np.frame.unitFrame:GetScale() or 1,
+        baseStrata = np.frame.unitFrame:GetFrameStrata() or "MEDIUM"
+    }
+end
+
+function NameplateManager:CleanupNameplateInfo(id)
+    if not id then
+        return
+    end
+    local np = GPlaterNS.State.Nameplates[id]
+    if np and np.frame and np.frame.unitFrame then
+        local resetEffects = {
+            COLOR = { healthBar = nil, nameText = nil, border = nil },
+            SCALE = nil, FLASH = false, HIDE = false, TOP = false, LOW = false, UNIQUE = false,
+            sourceAura = {}
+        }
+        GPlaterNS.EffectUtils:ApplyEffects(np.frame.unitFrame, id, resetEffects, np.type)
+        if np.frame.unitFrame.GPlaterNameTextUpdate then
+            np.frame.unitFrame.GPlaterNameTextUpdate:SetScript("OnUpdate", nil)
+            np.frame.unitFrame.GPlaterNameTextUpdate.unitFrameRef = nil
+            np.frame.unitFrame.GPlaterNameTextUpdate:Hide()
+            np.frame.unitFrame.GPlaterNameTextUpdate = nil
+            np.frame.unitFrame.GPlaterNameTextColor = nil
+        end
+        if np.frame.unitFrame.GPlaterFlashTimer then
+            np.frame.unitFrame.GPlaterFlashTimer = nil
+        end
+        if np.frame.unitFrame.GPlaterEffects then
+            np.frame.unitFrame.GPlaterEffects = {}
+        end
+    end
+    if GPlaterNS.State.UnitsMarkedAsUniqueByGPlater[id] then
+        local uniqueAuraID = GPlaterNS.State.UnitsMarkedAsUniqueByGPlater[id].auraID
+        GPlaterNS.EffectUtils.effectHandlers.UNIQUE.reset(
+            np and np.frame and np.frame.unitFrame,
+            np and np.type,
+            id,
+            uniqueAuraID
+        )
+    end
+    GPlaterNS.State.ActiveAuras[id] = nil
+    GPlaterNS.State.PlaterSettings[id] = nil
+    GPlaterNS.State.HiddenNameplates[id] = nil
+    GPlaterNS.State.UnitsMarkedAsUniqueByGPlater[id] = nil
+    GPlaterNS.State.Nameplates[id] = nil
+    if GPlaterNS.State.EffectCache then
+        GPlaterNS.State.EffectCache[id] = nil
+    end
+end
+
+function NameplateManager:CleanupInvalidData()
+    for guid, np in pairs(GPlaterNS.State.Nameplates) do
+        if not self:ValidateNameplate(np) then
+            self:CleanupNameplateInfo(guid)
+        elseif np.frame and np.frame.GPlaterEffects then
+            local hasActiveEffects = false
+            for spellID, _ in pairs(GPlaterNS.State.ActiveAuras[guid] or {}) do
+                if GPlaterNS.State.auraConfig[spellID] then
+                    hasActiveEffects = true
+                    break
+                end
+            end
+            if not hasActiveEffects then
+                np.frame.GPlaterEffects = {}
+            end
+        end
+    end
+end
+
+function NameplateManager:UpdateAndApplyAllEffects(guid)
+    GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: Processing GUID %s", 2, "nameplates", tostring(guid))
+    local np = self:GetNameplate(guid)
+    if not np then
+        GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: No valid nameplate for GUID %s", 3, "nameplates", tostring(guid))
+        return
+    end
+
+    local frame = np.frame.unitFrame
+    local unitType = np.type
+    local activeUnitAuras = GPlaterNS.State.ActiveAuras[guid] or {}
+
+    if not GPlaterNS.State.EffectCache then GPlaterNS.State.EffectCache = {} end
+    local cacheKey = guid
+    
+    local auraHashParts = {}
+    for spellID, auraData in pairs(activeUnitAuras) do
+        table.insert(auraHashParts, spellID .. ":" .. (auraData.applications or 1))
+    end
+    table.sort(auraHashParts) -- 确保哈希顺序一致
+    local auraHash = table.concat(auraHashParts, ";")
+    GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: GUID %s - Current Aura Hash: %s", 3, "nameplates", guid, auraHash)
+
+    local cache = GPlaterNS.State.EffectCache[cacheKey]
+    if cache and cache.hash == auraHash and not cache.auraListChanged then
+        GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: Using cached effects for GUID %s", 3, "nameplates", guid)
+        GPlaterNS.EffectUtils:ApplyEffects(frame, guid, cache.effects, unitType)
+        return
+    end
+    
+    if cache then
+        GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: Cache miss for GUID %s. Old Hash: %s, AuraListChanged: %s", 2, "nameplates", guid, tostring(cache.hash), tostring(cache.auraListChanged))
+    else
+        GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: No cache for GUID %s. Computing new effects.", 2, "nameplates", guid)
+    end
+
+    local newSortedAuras = {} -- 使用这个新的表来构建
+    for key_auraID_str, auraConfigEntry in pairs(GPlaterNS.State.auraConfig) do
+        local cfg = auraConfigEntry.config
+        if cfg.isKnown then
+            GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: Processing rule for key [%s] because cfg.isKnown is true.", 3, "nameplates", key_auraID_str) 
+            local isActuallyActive = false
+            local effectiveTimestamp = 0
+            local durationForSortEntry = 0
+            local stacksForSortEntry = 1
+            local representativeAuraData = nil
+
+            if auraConfigEntry.isCombination then
+                local allRequiredPresent = true
+                local latestTimestampForCombination = 0
+                if #auraConfigEntry.requiredIDs == 0 then allRequiredPresent = false end -- 安全检查
+
+                for _, reqID in ipairs(auraConfigEntry.requiredIDs) do
+                    if not (activeUnitAuras[reqID] and activeUnitAuras[reqID].spellId == reqID) then
+                        allRequiredPresent = false
+                        break
+                    end
+                    if activeUnitAuras[reqID].timestamp > latestTimestampForCombination then
+                        latestTimestampForCombination = activeUnitAuras[reqID].timestamp
+                    end
+                end
+
+                if allRequiredPresent then
+                    isActuallyActive = true
+                    effectiveTimestamp = latestTimestampForCombination
+                
+                local shortestOriginalDuration = math.huge
+                for _, reqID in ipairs(auraConfigEntry.requiredIDs) do
+                    if activeUnitAuras[reqID] then
+                        shortestOriginalDuration = math.min(shortestOriginalDuration, activeUnitAuras[reqID].duration or 0)
+                    else 
+                        shortestOriginalDuration = 0 
+                        GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: ERROR - Missing activeUnitAuras data for reqID %s in active combo %s", 4, "nameplates", tostring(reqID), key_auraID_str)
+                        break
+                    end
+                end
+                durationForSortEntry = (shortestOriginalDuration == math.huge) and 0 or shortestOriginalDuration
+                stacksForSortEntry = 1 -- 层数对组合光环无效 (或始终为1)
+                -- 代表性光环数据，如果需要，可以取组合中的第一个
+                if #auraConfigEntry.requiredIDs > 0 and activeUnitAuras[auraConfigEntry.requiredIDs[1]] then
+                    representativeAuraData = activeUnitAuras[auraConfigEntry.requiredIDs[1]]
+                end
+            end
+        else -- 非组合光环 (单个光环规则)
+                local singleAuraID = auraConfigEntry.requiredIDs[1]
+                if activeUnitAuras[singleAuraID] and activeUnitAuras[singleAuraID].spellId == singleAuraID then
+                    isActuallyActive = true
+                    effectiveTimestamp = activeUnitAuras[singleAuraID].timestamp
+                    durationForSortEntry = activeUnitAuras[singleAuraID].duration or 0
+                    stacksForSortEntry = activeUnitAuras[singleAuraID].applications or 1
+                    representativeAuraData = activeUnitAuras[singleAuraID]
+                    
+                    if cfg.minStacks > 0 and stacksForSortEntry < cfg.minStacks then
+                        isActuallyActive = false
+                    end
+
+                    if isActuallyActive and cfg.cancelAt30Percent then
+                         if representativeAuraData and representativeAuraData.effectiveExpirationTime and 
+                            representativeAuraData.effectiveExpirationTime ~= math.huge and 
+                            representativeAuraData.effectiveExpirationTime <= GetTime() then
+                            GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: Aura effect for %s (key: %s) cancelled due to 30%% rule.", 3, "nameplates", guid, tostring(key_auraID_str))
+                            isActuallyActive = false 
+                        end
+                    end
+                end
+            end
+            if isActuallyActive then
+                table.insert(newSortedAuras, {
+                    spellID_or_key = key_auraID_str,
+                    config = cfg,
+                    applicationTime = effectiveTimestamp,
+                    duration = durationForSortEntry,
+                    stacks = stacksForSortEntry,
+                    auraData = representativeAuraData -- Store representative data if needed for specific effects
+                })
+            end
+        end
+    end
+    
+    table.sort(newSortedAuras, function(a, b)
+        if a.applicationTime ~= b.applicationTime then
+            return a.applicationTime > b.applicationTime 
+        else
+            local aConfigEntry = GPlaterNS.State.auraConfig[a.spellID_or_key]
+            local bConfigEntry = GPlaterNS.State.auraConfig[b.spellID_or_key]
+            
+            local aNumRequired = aConfigEntry and #aConfigEntry.requiredIDs or 0
+            local bNumRequired = bConfigEntry and #bConfigEntry.requiredIDs or 0
+            
+            if aNumRequired ~= bNumRequired then
+                return aNumRequired > bNumRequired 
+            else
+                return tostring(a.spellID_or_key) < tostring(b.spellID_or_key)
+            end
+        end
+    end)
+    
+    GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: GUID %s - Sorted %d active effect rules", 2, "nameplates", guid, #newSortedAuras)
+    for i, sa_entry in ipairs(newSortedAuras) do
+        GPlaterNS.Utils:Log("  SortedRule[%d]: key=%s, effectType=%s, stacks=%d, isKnown=%s, applyHB=%s, HBColor=%s, applyScale=%s, Scale=%s", 3, "nameplates", 
+            i, sa_entry.spellID_or_key, 
+            tostring(sa_entry.config.effect), 
+            sa_entry.stacks, 
+            tostring(sa_entry.config.isKnown),
+            tostring(sa_entry.config.applyHealthBar),
+            tostring(sa_entry.config.healthBarColor),
+            tostring(sa_entry.config.applyScale),
+            tostring(sa_entry.config.scale)
+        )
+    end
+
+    -- 初始化最终效果表 (仅一次)
+    local finalEffects = {
+        COLOR = { healthBar = nil, nameText = nil, border = nil },
+        SCALE = nil, FLASH = false, HIDE = false, TOP = false, LOW = false, UNIQUE = false,
+        sourceAura = { healthBar = nil, nameText = nil, border = nil, scale = nil, flash = nil, hide = nil, top = nil, low = nil, unique = nil }
+    }
+    
+    -- 效果聚合：第一遍处理 UNIQUE 效果 (使用 newSortedAuras)
+    local hasActiveUniqueOnThisUnit = false
+    local uniqueSourceKey = nil
+    for _, auraEntry in ipairs(newSortedAuras) do
+        local cfg = auraEntry.config
+        -- minStacks 检查在这里仍然适用，因为 cfg.minStacks 对组合已被设为0
+        if (cfg.minStacks == 0 or auraEntry.stacks >= cfg.minStacks) then 
+            if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_UNIQUE then
+                hasActiveUniqueOnThisUnit = true
+                finalEffects.UNIQUE = true
+                finalEffects.sourceAura.unique = auraEntry.spellID_or_key
+                uniqueSourceKey = auraEntry.spellID_or_key
+                GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: GUID %s - HAS_UNIQUE_EFFECT from key %s", 2, "nameplates", guid, auraEntry.spellID_or_key)
+                break 
+            end
+        end
+    end
+
+    -- 效果聚合：第二遍处理其他效果 (使用 newSortedAuras)
+    for _, auraEntry in ipairs(newSortedAuras) do
+        local key = auraEntry.spellID_or_key
+        local cfg = auraEntry.config
+        local stacks = auraEntry.stacks 
+
+        if (cfg.minStacks == 0 or stacks >= cfg.minStacks) then -- cfg.minStacks 对于组合已经是0
+             if (hasActiveUniqueOnThisUnit and key == uniqueSourceKey) or not hasActiveUniqueOnThisUnit then
+                GPlaterNS.Utils:Log("  Aggregating: key=%s, stacks=%d, minStacks=%d, effectType=%s -> Qualified", 3, "nameplates", key, stacks, cfg.minStacks, cfg.effect)
+                
+                if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_HIDE then
+                    if not hasActiveUniqueOnThisUnit and not finalEffects.HIDE then -- 只有当没有 UNIQUE 且 HIDE 未被更高优先级设置时
+                        finalEffects.HIDE = true
+                        finalEffects.sourceAura.hide = key
+                    end
+                end
+                if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_TOP then
+                    if not finalEffects.TOP then -- 允许较低优先级的 LOW 被覆盖
+                        finalEffects.TOP = true
+                        finalEffects.LOW = false 
+                        finalEffects.sourceAura.top = key
+                        finalEffects.sourceAura.low = nil
+                    end
+                elseif cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_LOW then
+                    if not finalEffects.TOP and not finalEffects.LOW then -- TOP 优先于 LOW
+                        finalEffects.LOW = true
+                        finalEffects.sourceAura.low = key
+                    end
+                end
+                if cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_FLASH then
+                    if not finalEffects.FLASH then
+                        finalEffects.FLASH = true
+                        finalEffects.sourceAura.flash = key
+                    end
+                end
+
+                if cfg.applyScale and finalEffects.SCALE == nil then
+                    finalEffects.SCALE = cfg.scale
+                    finalEffects.sourceAura.scale = key
+                end
+                if cfg.applyHealthBar and finalEffects.COLOR.healthBar == nil then
+                    finalEffects.COLOR.healthBar = cfg.healthBarColor
+                    finalEffects.sourceAura.healthBar = key
+                end
+                if cfg.applyNameText and finalEffects.COLOR.nameText == nil then
+                    finalEffects.COLOR.nameText = cfg.nameTextColor
+                    finalEffects.sourceAura.nameText = key
+                end
+                if cfg.applyBorder and finalEffects.COLOR.border == nil then
+                    finalEffects.COLOR.border = cfg.borderColor
+                    finalEffects.sourceAura.border = key
+                end
+            else
+                 GPlaterNS.Utils:Log("    -> Skipped due to UNIQUE conflict (key %s)", 3, "nameplates", key)
+            end
+        else
+             GPlaterNS.Utils:Log("    -> Skipped due to minStacks not met (key %s, stacks %d < %d)", 3, "nameplates", key, stacks, cfg.minStacks)
+        end
+    end
+
+    -- 处理外部 UNIQUE 效果（当此单位没有自己的 UNIQUE 时）
+    if not hasActiveUniqueOnThisUnit then
+        for otherUniqueGuid, uniqueData in pairs(GPlaterNS.State.UnitsMarkedAsUniqueByGPlater) do
+            if otherUniqueGuid ~= guid then -- 如果其他单位标记为 UNIQUE
+                finalEffects.HIDE = true
+                finalEffects.sourceAura.hide = "EXTERNAL_UNIQUE_" .. otherUniqueGuid
+                GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: GUID %s - SET HIDE due to EXTERNAL_UNIQUE from %s", 2, "nameplates", guid, otherUniqueGuid)
+                break 
+            end
+        end
+    end
+
+    -- 如果是 HIDE（且非自身 UNIQUE 效果导致），清除其他视觉效果
+    if finalEffects.HIDE and not hasActiveUniqueOnThisUnit then
+        GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: GUID %s - IS_HIDE (non-self-unique). Clearing visual effects.", 2, "nameplates", guid)
+        finalEffects.COLOR = { healthBar = nil, nameText = nil, border = nil }
+        finalEffects.SCALE = nil
+        finalEffects.FLASH = false
+        finalEffects.TOP = false
+        finalEffects.LOW = false
+        -- HIDE 和 UNIQUE 的 sourceAura 已经设置，不需要清除
+    end
+
+    -- 如果自身有 UNIQUE，强制不隐藏（覆盖其他规则可能导致的 HIDE）
+    if hasActiveUniqueOnThisUnit and finalEffects.HIDE then
+        GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: GUID %s - HAS_UNIQUE, overriding HIDE to false.", 2, "nameplates", guid)
+        finalEffects.HIDE = false
+        finalEffects.sourceAura.hide = nil -- 清除可能由其他规则设置的 HIDE 源
+    end
+
+    -- 重置所有效果到基础状态，然后再应用最终聚合的效果
+    -- 这确保了从任何先前状态的干净过渡
+    GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: GUID %s - Resetting all effects to base states before applying final.", 2, "nameplates", guid)
+    GPlaterNS.EffectUtils.ColorEffect:Reset(frame, "healthBar", unitType, guid)
+    GPlaterNS.EffectUtils.ColorEffect:Reset(frame, "nameText", unitType, guid) -- guid for nameTextUpdateQueue
+    GPlaterNS.EffectUtils.ColorEffect:Reset(frame, "border", unitType, guid)
+    GPlaterNS.EffectUtils.ScaleEffect:Reset(frame, guid)
+    GPlaterNS.EffectUtils.LevelEffect:Reset(frame, guid)
+    GPlaterNS.EffectUtils.FlashEffect:Reset(frame) 
+    GPlaterNS.EffectUtils.HideEffect:ResetToBase(frame, guid) -- 这个会处理 Show() 如果没有任何隐藏原因
+
+    -- 应用最终聚合的效果
+    GPlaterNS.State.EffectCache[cacheKey] = {
+        hash = auraHash,
+        effects = finalEffects,
+        auraListChanged = false 
+    }
+    -- 增强 finalEffects 的日志输出
+    local fe_log = "FinalEffects -> HIDE:" .. tostring(finalEffects.HIDE) ..
+                 " UNIQUE:" .. tostring(finalEffects.UNIQUE) ..
+                 " SCALE:" .. tostring(finalEffects.SCALE or "nil") ..
+                 " HBColor:" .. tostring(finalEffects.COLOR.healthBar or "nil") ..
+                 " NameColor:" .. tostring(finalEffects.COLOR.nameText or "nil") ..
+                 " BorderColor:" .. tostring(finalEffects.COLOR.border or "nil") ..
+                 " FLASH:" .. tostring(finalEffects.FLASH) ..
+                 " TOP:" .. tostring(finalEffects.TOP) ..
+                 " LOW:" .. tostring(finalEffects.LOW)
+    GPlaterNS.Utils:Log("UpdateAndApplyAllEffects: Applying final aggregated effects for GUID %s: %s", 1, "nameplates", guid, fe_log)
+    
+    GPlaterNS.EffectUtils:ApplyEffects(frame, guid, finalEffects, unitType)
+end
+
+local expirationQueue = {} -- { guid, spellID, expirationTime }
+
+function AuraManager:UpdateAuraState(id, sID, data)
+    if not self then
+        if GPlaterNS and GPlaterNS.Utils and GPlaterNS.Utils.Log then
+            GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): CRITICAL ERROR - 'self' is nil!", 4, "auras")
+        end
+        return false
+    end
+    GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): 'self' is valid (type: %s). Function CALLED for GUID %s, spellID %d.", 1, "auras", type(self), tostring(id), sID)
+
+
+    if not id or not sID or not data then 
+        GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): ERROR - invalid inputs (id:%s, sID:%s, data:%s)", 4, "auras", tostring(id), tostring(sID), tostring(data))
+        return false 
+    end
+    local existing = GPlaterNS.State.ActiveAuras[id] and GPlaterNS.State.ActiveAuras[id][sID]
+    GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): 'existing' variable is: %s", 1, "auras", tostring(existing))
+
+    GPlaterNS.State.ActiveAuras[id] = GPlaterNS.State.ActiveAuras[id] or {}
+    GPlaterNS.State.ActiveAuras[id][sID] = data 
+    GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): ActiveAuras updated.", 1, "auras")
+
+    -- expirationQueue logic (保持不变)
+    for i = #expirationQueue, 1, -1 do
+        local entry = expirationQueue[i]
+        if entry.guid == id and entry.spellID == sID then
+            table.remove(expirationQueue, i)
+        end
+    end
+    if data.effectiveExpirationTime and data.effectiveExpirationTime ~= math.huge then
+        table.insert(expirationQueue, { guid = id, spellID = sID, expirationTime = data.effectiveExpirationTime })
+        table.sort(expirationQueue, function(a, b) return a.expirationTime < b.expirationTime end)
+    end
+
+    -- EffectCache logic (保持不变)
+    if GPlaterNS.State.EffectCache and GPlaterNS.State.EffectCache[id] then
+        if not existing or (existing.applications ~= (data.applications or 1)) then
+            GPlaterNS.State.EffectCache[id].auraListChanged = true
+        end
+    end
+    
+    local applicationsInData = data.applications or 1
+    local applicationsInExisting = existing and existing.applications
+    local condition_NotExisting = not existing
+    local condition_AppsChanged = existing and (applicationsInExisting ~= applicationsInData)
+
+    GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): Before 'Condition B'. not existing: %s. existing.apps: %s. data.apps: %s. appsChanged: %s", 1, "auras", 
+        tostring(condition_NotExisting), 
+        tostring(applicationsInExisting), 
+        tostring(applicationsInData),
+        tostring(condition_AppsChanged)
+    )
+
+    if condition_NotExisting or condition_AppsChanged then -- Condition B
+        GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): Condition B is TRUE. Proceeding.", 1, "auras")
+        local np = GPlaterNS.NameplateManager:GetNameplate(id) 
+        GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): GetNameplate returned: %s", 1, "auras", tostring(np))
+        if np and np.frame and np.frame.unitFrame then
+            GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): Nameplate object is VALID.", 1, "auras")
+            local sID_string_key = tostring(sID) 
+            local cfgEntry = GPlaterNS.State.auraConfig[sID_string_key]
+            local cfg = cfgEntry and cfgEntry.config 
+            GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): Looked up cfgEntry for key '%s', found: %s. Cfg found: %s", 1, "auras", sID_string_key, tostring(cfgEntry ~= nil), tostring(cfg ~= nil))
+
+            if cfgEntry and cfgEntry.config and cfgEntry.config.effect == GPlaterNS.Constants.EFFECT_TYPE_UNIQUE then
+                GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): Applying UNIQUE effect for sID [%s]", 1, "auras", tostring(sID))
+                GPlaterNS.EffectUtils.effectHandlers.UNIQUE.apply(np.frame.unitFrame, np.type, id, sID_string_key)
+            end
+            GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): >>> About to call UpdateAndApplyAllEffects for GUID %s, spellID %d", 1, "auras", id, sID)
+            GPlaterNS.NameplateManager:UpdateAndApplyAllEffects(id) 
+            GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): <<< Successfully called UpdateAndApplyAllEffects for GUID %s, spellID %d.", 1, "auras", id, sID)
+        else
+            GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): No valid nameplate object (np is nil or frame invalid) for GUID %s.", 4, "auras", id)
+        end
+    else
+        GPlaterNS.Utils:Log("UpdateAuraState (ULTRA DEBUG): Condition B is FALSE. Aura %s for GUID %s existed and applications (%s) did not change from (%s), or initial data issue. No immediate effect update triggered.", 1, "auras", 
+            tostring(sID), 
+            tostring(id), 
+            tostring(applicationsInData), 
+            tostring(applicationsInExisting)
+        )
+    end
+
+    return existing and (existing.applications ~= (data.applications or 1) or existing.expirationTime ~= (data.expirationTime or math.huge))
+end
+
+-- 请找到并完整替换 AuraManager:RemoveAuraState 函数
+function AuraManager:RemoveAuraState(id, sID)
+    GPlaterNS.Utils:Log("RemoveAuraState: Called for GUID %s, spellID %d", 3, "auras", tostring(id), tostring(sID))
+    if GPlaterNS.State.ActiveAuras[id] and GPlaterNS.State.ActiveAuras[id][sID] then
+        GPlaterNS.State.ActiveAuras[id][sID] = nil
+        if not next(GPlaterNS.State.ActiveAuras[id]) then 
+            GPlaterNS.State.ActiveAuras[id] = nil
+        end
+
+        for i = #expirationQueue, 1, -1 do
+            local entry = expirationQueue[i]
+            if entry.guid == id and entry.spellID == sID then
+                table.remove(expirationQueue, i)
+                GPlaterNS.Utils:Log("RemoveAuraState: Removed queue entry for GUID %s, spellID %d", 3, "auras", id, sID)
+            end
+        end
+
+        if GPlaterNS.State.EffectCache and GPlaterNS.State.EffectCache[id] then
+            GPlaterNS.State.EffectCache[id].auraListChanged = true
+            GPlaterNS.Utils:Log("RemoveAuraState: Marked auraListChanged for GUID %s due to aura %d removal", 3, "auras", id, sID)
+        end
+
+        local np = GPlaterNS.NameplateManager:GetNameplate(id)
+        if np and np.frame and np.frame.unitFrame then
+            local sID_string_key = tostring(sID) -- *** 使用字符串键 ***
+            local cfgEntry = GPlaterNS.State.auraConfig[sID_string_key]
+            local cfg = cfgEntry and cfgEntry.config
+            GPlaterNS.Utils:Log("RemoveAuraState: Looked up cfgEntry for sID [%s] (using key: '%s'), found: %s. Cfg found: %s", 3, "auras", tostring(sID), sID_string_key, tostring(cfgEntry ~= nil), tostring(cfg ~= nil))
+
+            if cfgEntry and cfgEntry.config and cfgEntry.config.effect == GPlaterNS.Constants.EFFECT_TYPE_UNIQUE then -- 使用 cfgEntry.config
+                GPlaterNS.Utils:Log("RemoveAuraState: Resetting UNIQUE effect for sID [%s]", 3, "auras", tostring(sID))
+                GPlaterNS.EffectUtils.effectHandlers.UNIQUE.reset(np.frame.unitFrame, np.type, id, cfgEntry.config.auraID)
+            end
+            GPlaterNS.Utils:Log("RemoveAuraState: About to call UpdateAndApplyAllEffects for GUID %s, spellID %d", 2, "auras", id, sID)
+            GPlaterNS.NameplateManager:UpdateAndApplyAllEffects(id)
+            GPlaterNS.Utils:Log("RemoveAuraState: Successfully called UpdateAndApplyAllEffects for GUID %s, spellID %d. Effect update triggered.", 2, "auras", id, sID)
+        else
+            GPlaterNS.Utils:Log("RemoveAuraState: No valid nameplate object for GUID %s when trying to trigger effect update for spellID %d (np is nil or frame invalid).", 4, "auras", id, sID)
+        end
+    else
+        GPlaterNS.Utils:Log("RemoveAuraState: Aura %s not active on GUID %s. No removal action taken.", 3, "auras", tostring(sID), tostring(id))
+    end
+end
+
+function EventManager:HandleCombatLog(ts, sub, sIDsrc, dID, spID, duration, amt, relevantAuraKey)
+    GPlaterNS.Utils:Log("HandleCombatLog: 子事件: %s, 光环ID: %s, 目标GUID: %s, 相关键: %s", 2, "events", tostring(sub), tostring(spID), tostring(dID), tostring(relevantAuraKey))
+
+    local nI = NameplateManager:GetNameplate(dID)
+    if not nI then
+        GPlaterNS.Utils:Log("HandleCombatLog: 无有效姓名板，目标GUID=%s", 3, "events", tostring(dID))
+        return
+    end
+
+    local uFrame = nI.frame.unitFrame
+    local uType = nI.type
+    local pvpColoringEnabled = GPlaterNS.Config:Get({"AuraColoring", "settings", "pvpColoring"}, true)
+    
+    if not pvpColoringEnabled and uType == "enemyplayer" then
+        if GPlaterNS.State.ActiveAuras[dID] and GPlaterNS.State.ActiveAuras[dID][spID] then
+            if not GPlaterNS.AuraManager then
+                GPlaterNS.Utils:Log("HandleCombatLog: 严重错误 - GPlaterNS.AuraManager 为空!", 4, "events")
+                return
+            end
+            if type(GPlaterNS.AuraManager.RemoveAuraState) ~= "function" then
+                GPlaterNS.Utils:Log("HandleCombatLog: 严重错误 - GPlaterNS.AuraManager.RemoveAuraState 不是函数!", 4, "events")
+                return
+            end
+            GPlaterNS.AuraManager:RemoveAuraState(dID, spID)
+        end
+        GPlaterNS.Utils:Log("HandleCombatLog: 敌对玩家禁用 PvP 着色", 3, "events")
+        return
+    end
+
+    if not relevantAuraKey then
+        GPlaterNS.Utils:Log("HandleCombatLog: 无相关光环键，spID: %s", 4, "events", tostring(spID))
+        return 
+    end
+
+    local cfgEntryForEffects = GPlaterNS.State.auraConfig[relevantAuraKey]
+    if not cfgEntryForEffects or not cfgEntryForEffects.config then
+        GPlaterNS.Utils:Log("HandleCombatLog: 无法获取 cfgEntryForEffects，键: %s", 4, "events", tostring(relevantAuraKey))
+        return
+    end
+    local cfg = cfgEntryForEffects.config
+
+    if sub == "SPELL_AURA_REMOVED" then
+        local wasUnique = cfg.effect == GPlaterNS.Constants.EFFECT_TYPE_UNIQUE
+        GPlaterNS.AuraManager:RemoveAuraState(dID, spID)
+        if wasUnique then
+            GPlaterNS.EffectUtils.effectHandlers.UNIQUE.reset(uFrame, uType, dID, relevantAuraKey)
+        end
+        GPlaterNS.Utils:Log("HandleCombatLog: 光环 %d (键: %s) 从 %s 移除", 2, "events", spID, tostring(relevantAuraKey), tostring(dID))
+    else
+        if sub == "SPELL_AURA_APPLIED_DOSE" and cfg.minStacks == 0 and not cfgEntryForEffects.isCombination then 
+            return 
+        end
+
+        local aGD = { 
+            spellId = spID,
+            applications = amt or 1,
+            timestamp = ts,
+            duration = 0,
+        }
+
+        if sub == "SPELL_AURA_APPLIED" or sub == "SPELL_AURA_REFRESH" then
+            local unit = UnitTokenFromGUID(dID)
+            local auraDuration, auraExpirationTime = 0, 0
+            if unit then
+                for i = 1, 40 do
+                    local uAuraData = C_UnitAuras.GetAuraDataByIndex(unit, i, "HARMFUL")
+                    if uAuraData and uAuraData.spellId == spID and (uAuraData.sourceGUID == GPlaterNS.State.playerGUID or uAuraData.sourceGUID == GPlaterNS.State.petGUID) then
+                        auraDuration = uAuraData.duration or 0
+                        auraExpirationTime = uAuraData.expirationTime or 0
+                        break
+                    end
+                end
+            else
+                GPlaterNS.Utils:Log("HandleCombatLog: 目标GUID %s 无单位标识，无法获取光环持续时间", 3, "events", tostring(dID))
+            end
+
+            aGD.duration = auraDuration
+            aGD.expirationTime = auraExpirationTime > 0 and auraExpirationTime or math.huge
+            if cfg.cancelAt30Percent and not cfgEntryForEffects.isCombination then
+                if auraDuration > 0 and auraExpirationTime > 0 then
+                    aGD.actualMaxDuration = auraDuration
+                    aGD.effectiveExpirationTime = auraExpirationTime - (auraDuration * 0.7)
+                else
+                    aGD.actualMaxDuration = auraDuration
+                    aGD.effectiveExpirationTime = aGD.expirationTime
+                end
+            else
+                aGD.actualMaxDuration = auraDuration
+                aGD.effectiveExpirationTime = aGD.expirationTime
+            end
+        elseif sub == "SPELL_AURA_APPLIED_DOSE" then
+            local existingAura = GPlaterNS.State.ActiveAuras[dID] and GPlaterNS.State.ActiveAuras[dID][spID]
+            if existingAura then
+                aGD.duration = existingAura.duration
+                aGD.expirationTime = existingAura.expirationTime
+                aGD.effectiveExpirationTime = existingAura.effectiveExpirationTime
+                aGD.actualMaxDuration = existingAura.actualMaxDuration
+            else
+                local unit = UnitTokenFromGUID(dID)
+                local auraDuration, auraExpirationTime = 0, 0
+                if unit then
+                    for i = 1, 40 do
+                        local uAuraData = C_UnitAuras.GetAuraDataByIndex(unit, i, "HARMFUL")
+                        if uAuraData and uAuraData.spellId == spID and (uAuraData.sourceGUID == GPlaterNS.State.playerGUID or uAuraData.sourceGUID == GPlaterNS.State.petGUID) then
+                            auraDuration = uAuraData.duration or 0
+                            auraExpirationTime = uAuraData.expirationTime or 0
+                            break
+                        end
+                    end
+                end
+                aGD.duration = auraDuration
+                aGD.expirationTime = auraExpirationTime > 0 and auraExpirationTime or math.huge
+                aGD.effectiveExpirationTime = aGD.expirationTime
+                aGD.actualMaxDuration = aGD.duration
+            end
+        end
+        
+        if not GPlaterNS.AuraManager then
+            GPlaterNS.Utils:Log("HandleCombatLog: 严重错误 - GPlaterNS.AuraManager 为空!", 4, "events")
+            return
+        end
+        if type(GPlaterNS.AuraManager.UpdateAuraState) ~= "function" then
+            GPlaterNS.Utils:Log("HandleCombatLog: 严重错误 - GPlaterNS.AuraManager.UpdateAuraState 不是函数!", 4, "events")
+            return
+        end
+        if GPlaterNS.AuraManager:UpdateAuraState(dID, spID, aGD) then
+            GPlaterNS.Utils:Log("HandleCombatLog: 光环 %d (键: %s) 在 %s 上应用/刷新/层数变更。层数: %d", 2, "events", spID, tostring(relevantAuraKey), tostring(dID), aGD.applications)
+        else
+            GPlaterNS.Utils:Log("HandleCombatLog: 光环 %d (键: %s) 在 %s 上的状态更新未触发变化。层数: %d", 3, "events", spID, tostring(relevantAuraKey), tostring(dID), aGD.applications)
+        end
+    end
+end
+
+function EventManager:HandleNamePlateUnitAdded(unit)
+    if not unit or not UnitExists(unit) or not UnitCanAttack("player", unit) then
+        return
+    end
+    local guid = UnitGUID(unit)
+    if not guid then 
+        GPlaterNS.Utils:Log("HandleNamePlateUnitAdded: no guid", 4, "events")
+        return 
+    end
+    NameplateManager:RegisterUnit(guid, unit)
+end
+
+function EventManager:HandleNamePlateUnitRemoved(unit)
+    if not unit or not UnitExists(unit) then 
+        return 
+    end
+    local id = UnitGUID(unit)
+    if not id then 
+        GPlaterNS.Utils:Log("HandleNamePlateUnitRemoved: no guid", 4, "events")
+        return 
+    end
+    NameplateManager:CleanupNameplateInfo(id)
+end
+
+function EventManager:HandleSpecChange()
+    GPlaterNS.Config:RecheckAuraKnowledgeAndUpdateSet()
+end
+
+function EventManager:CheckAuraExpiration()
+    local currentTime = GetTime()
+    local guidsToUpdate = {}
+
+    -- 处理所有已过期的光环
+    while #expirationQueue > 0 and expirationQueue[1].expirationTime <= currentTime do
+        local entry = table.remove(expirationQueue, 1)
+        local guid, spellID = entry.guid, entry.spellID
+        if GPlaterNS.State.ActiveAuras[guid] and GPlaterNS.State.ActiveAuras[guid][spellID] then
+            GPlaterNS.AuraManager:RemoveAuraState(guid, spellID)
+            guidsToUpdate[guid] = GPlaterNS.State.auraConfig[spellID] and GPlaterNS.State.auraConfig[spellID].config.effect == GPlaterNS.Constants.EFFECT_TYPE_UNIQUE and spellID or nil
+            GPlaterNS.Utils:Log("CheckAuraExpiration: Aura %d expired for GUID %s", 2, "events", spellID, tostring(guid))
+        end
+    end
+
+    -- 更新受影响单位的效果
+    for guid, uniqueSpellID in pairs(guidsToUpdate) do
+        local np = GPlaterNS.NameplateManager:GetNameplate(guid)
+        if np and np.frame and np.frame.unitFrame then
+            if uniqueSpellID then
+                GPlaterNS.EffectUtils.effectHandlers.UNIQUE.reset(np.frame.unitFrame, np.type, guid, uniqueSpellID)
+            end
+            GPlaterNS.NameplateManager:UpdateAndApplyAllEffects(guid)
+            GPlaterNS.Utils:Log("CheckAuraExpiration: Triggered effect update for GUID %s, uniqueSpellID %s", 2, "events", guid, tostring(uniqueSpellID))
+        else
+            GPlaterNS.Utils:Log("CheckAuraExpiration: No valid nameplate for GUID %s", 3, "events", guid)
+        end
+    end
+end
+
+local tickers = {}
+
+local function InitializeTimers()
+    tickers.main = C_Timer.NewTicker(0.5, function()
+    for guid, np in pairs(GPlaterNS.State.Nameplates) do
+        if np.frame and np.frame.GPlaterFlashTimer then
+            if GetTime() < np.frame.GPlaterFlashTimer then -- 检查是否仍在5秒持续时间内
+                local uF = np.frame.unitFrame
+                if uF and uF:IsShown() and uF.namePlateUnitToken and UnitExists(uF.namePlateUnitToken) then
+                    -- GPlaterNS.Utils:Log("Timer: Re-flashing %s", 3, "auras", guid)
+                    pcall(Plater.FlashNameplateBody, uF, nil, 0.5) -- 假设 Plater.FlashNameplateBody 的第三个参数是动画片段时长
+                else
+                    np.frame.GPlaterFlashTimer = nil -- 无效框架，停止闪烁
+                end
+            else
+                np.frame.GPlaterFlashTimer = nil -- 超过5秒，停止闪烁
+                GPlaterNS.Utils:Log("Timer: Flash duration ended for %s", 3, "auras", guid)
+            end
+        end
+    end
+        EventManager:CheckAuraExpiration()
+    end)
+end
+
+local function CleanupTimers()
+    for name, ticker in pairs(tickers) do
+        if ticker then
+            ticker:Cancel()
+            tickers[name] = nil
+        end
+    end
+end
+
+EventFrame:RegisterEvent("ADDON_LOADED")
+EventFrame:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+EventFrame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
+EventFrame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
+EventFrame:RegisterEvent("PLAYER_TALENT_UPDATE")
+EventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+EventFrame:RegisterEvent("PLAYER_LOGOUT")
+EventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+EventFrame:SetScript("OnEvent", function(self, event, ...)
+    if event == "ADDON_LOADED" and ... == "GPlater" then
+        GPlaterNS.InitializeCoreModules()
+        GPlaterNS.Config:InitializeConfig()
+        C_Timer.After(1, InitializeTimers)
+    elseif event == "PLAYER_LOGOUT" then
+        CleanupTimers()
+    elseif event == "PLAYER_ENTERING_WORLD" then
+        CleanupTimers()
+        C_Timer.After(1, InitializeTimers)
+        C_Timer.After(10, function() GPlaterNS.Config:UpdateFriendlyNameplatesConfig() end)
+        C_Timer.After(1.5, function()
+            if GPlaterNS.State.PlaterSettings then
+                for guid, npSettings in pairs(GPlaterNS.State.PlaterSettings) do
+                    local np = GPlaterNS.NameplateManager:GetNameplate(guid)
+                    if np and np.frame and np.frame.unitFrame and np.frame.unitFrame:IsVisible() then
+                        local currentUnitFrame = np.frame.unitFrame
+                        local newBaseScale = currentUnitFrame:GetScale() or 1
+                        if npSettings.baseScale ~= newBaseScale then
+                            npSettings.baseScale = newBaseScale
+                        end
+                    end
+                end
+            end
+        end)
+    elseif event == "COMBAT_LOG_EVENT_UNFILTERED" then
+        local ts, sub, _, sIDsrc, _, _, _, dID, _, _, _, spID, _, _, auraType, amt = CombatLogGetCurrentEventInfo()
+        
+        -- 早期退出无关子事件
+        if not ({
+            SPELL_AURA_APPLIED = 1,
+            SPELL_AURA_REFRESH = 1,
+            SPELL_AURA_APPLIED_DOSE = 1,
+            SPELL_AURA_REMOVED = 1
+        })[sub] then
+            return
+        end
+        GPlaterNS.Utils:Log("CLEU: 子事件 %s, 光环ID: %s, 来源GUID: %s, 目标GUID: %s", 3, "events", sub, tostring(spID), tostring(sIDsrc), tostring(dID))
+    
+        -- 检查来源和目标 GUID（快速检查）
+        if sIDsrc ~= GPlaterNS.State.playerGUID and sIDsrc ~= GPlaterNS.State.petGUID then
+            return
+        end
+        if dID == GPlaterNS.State.playerGUID then
+            return
+        end
+    
+        -- 检查光环是否在 auraConfig 中相关
+        local isRelevantAura = false
+        local relevantAuraKey = nil
+        if GPlaterNS.State.auraConfig then
+            local spIDStr = tostring(spID)
+            if GPlaterNS.State.auraConfig[spIDStr] then
+                isRelevantAura = true
+                relevantAuraKey = spIDStr
+                GPlaterNS.Utils:Log("CLEU 过滤: 光环ID %s 作为直接键找到", 2, "events", spIDStr)
+            else
+                for key, configEntry in pairs(GPlaterNS.State.auraConfig) do
+                    if configEntry.isCombination and configEntry.requiredIDs then
+                        for _, reqId in ipairs(configEntry.requiredIDs) do
+                            if reqId == spID then
+                                isRelevantAura = true
+                                relevantAuraKey = key
+                                GPlaterNS.Utils:Log("CLEU 过滤: 光环ID %s 在组合键 %s 中找到", 2, "events", spIDStr, key)
+                                break
+                            end
+                        end
+                    end
+                    if isRelevantAura then break end
+                end
+            end
+        else
+            GPlaterNS.Utils:Log("CLEU 过滤: auraConfig 对于光环ID %s 缺失", 4, "events", tostring(spID))
+            return
+        end
+    
+        if not isRelevantAura then
+            GPlaterNS.Utils:Log("CLEU 过滤: 光环ID %s 无关", 3, "events", tostring(spID))
+            return
+        end
+    
+        -- 验证姓名板存在
+        local nI = NameplateManager:GetNameplate(dID)
+        if not nI then
+            GPlaterNS.Utils:Log("CLEU 过滤: 目标GUID %s 无姓名板", 3, "events", tostring(dID))
+            return
+        end
+
+        -- 处理事件
+        GPlaterNS.Utils:Log("CLEU: 处理光环ID %s (键: %s) 在目标GUID %s 上的事件", 1, "events", tostring(spID), tostring(relevantAuraKey), tostring(dID))
+        EventManager:HandleCombatLog(ts, sub, sIDsrc, dID, spID, nil, amt, relevantAuraKey)
+    elseif event == "NAME_PLATE_UNIT_ADDED" then
+        EventManager:HandleNamePlateUnitAdded(...)
+    elseif event == "NAME_PLATE_UNIT_REMOVED" then
+        EventManager:HandleNamePlateUnitRemoved(...)
+    elseif event == "PLAYER_TALENT_UPDATE" or event == "PLAYER_SPECIALIZATION_CHANGED" then
+        EventManager:HandleSpecChange()
     end
 end)
