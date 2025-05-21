@@ -120,6 +120,7 @@ local function CreateColorButton(parent, colDef, auraItem, onColorChanged, onApp
     button.disabledIcon:SetPoint("CENTER")
     button.disabledIcon:SetDrawLayer("OVERLAY", 7)
     button.disabledIcon:SetAlpha(1)
+    button.disabledIcon:SetSize(UI.DISABLEBTN_HEIGHT, UI.DISABLEBTN_HEIGHT)
     button.lastToggleTime = 0
 
     local defaultHex = (GPlaterNS.DefaultAuraSettings or {}).healthBarColor or GPlaterNS.Constants.DEFAULT_COLOR
@@ -456,7 +457,7 @@ function GPlaterNS.UI.ConfigureAuraRowControls(parentScrollChild, auraItem, yOff
                     end
                     ctrl = rF:CreateTexture(nil, "OVERLAY")
                     ctrl:SetTexture("Interface\\Buttons\\UI-GroupLoot-Pass-Up")
-                    ctrl:SetSize(UI.AURA_CONTROL_DEFAULT_HEIGHT, UI.AURA_CONTROL_DEFAULT_HEIGHT)
+                    ctrl:SetSize(UI.DISABLEBTN_HEIGHT, UI.DISABLEBTN_HEIGHT)
                     ctrl:SetAlpha(baseAlpha)
                 end
             elseif not ctrl then
@@ -549,7 +550,7 @@ function GPlaterNS.UI.ConfigureAuraRowControls(parentScrollChild, auraItem, yOff
                     itm.cancelAt30Percent = val
                     SaveAuraConfig(itm, "cancelAt30Percent", val)
                 end)
-                ctrl:SetSize(UI.AURA_CHECKBUTTON_WIDTH, UI.AURA_CHECKBUTTON_HEIGHT)
+                ctrl:SetSize(UI.DISABLEBTN_HEIGHT, UI.DISABLEBTN_HEIGHT)
             end
             if cD.title ~= L("AURA_CANCEL_30_PERCENT", "Cancel30%") or not isCombinationAura then
                 ctrl:SetChecked(cD.settings.get(auraItem))

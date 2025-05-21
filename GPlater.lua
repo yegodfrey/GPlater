@@ -1190,7 +1190,7 @@ function EventManager:HandleCombatLog(ts, sub, sIDsrc, dID, spID, duration, amt,
         GPlaterNS.Utils:Log("HandleCombatLog: 光环 %d (键: %s) 从 %s 移除", 2, "events", spID, tostring(relevantAuraKey), tostring(dID))
     else
         if sub == "SPELL_AURA_APPLIED_DOSE" and cfg.minStacks == 0 and not cfgEntryForEffects.isCombination then 
-            return 
+            return
         end
 
         local aGD = { 
